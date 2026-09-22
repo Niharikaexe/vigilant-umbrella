@@ -1,0 +1,126 @@
+# ---------------------------------------------------------------------------
+# The agent graph. This file *is* the orchestration -- adding, removing or
+# reordering a step is a config change. The dashboard renders this graph and
+# lights each node as it executes, so the picture on screen can never drift
+# from what actually ran.
+#
+# on_error:
+#   fail_closed  -- abort the run and require a human (the default for anything
+#                   that gates safety; never silently continue)
+#   degrade      -- log, mark the node degraded, carry on with reduced capability
+# ---------------------------------------------------------------------------
+version: 1
+name: "Maintenance & Asset Operations Copilot"
+
+nodes:
+  - id: intake
+    label: "Intake"
+    agent: intake
+    description: "Normalise any inbound channel into one canonical signal."
+    azure_service: null
+    on_error: fail_closed
+
+  - id: guard_input
+    label: "Input Guardrail"
+    agent: guard_input
+    description: "Screen inbound text for abuse and prompt injection before a model sees it."
+    azure_service: "Azure AI Content Safety"
+    on_error: fail_closed
+
+  - id: redact
+    label: "PII Redaction"
+    agent: redact
+    description: "Strip personal data before anything leaves the trust boundary."
+    azure_service: "Azure AI Language"
+    on_error: fail_closed
+
+  - id: translate
+    label: "Translate"
+    agent: translate
+    description: "Detect language and normalise to the working language."
+    azure_service: "Azure AI Translator"
+    on_error: degrade
+
+  - id: resolve_asset
+    label: "Asset Resolution"
+    agent: resolve_asset
+    description: "Match free text such as 'the aft deck pump' to a registry asset."
+    azure_service: "Azure OpenAI"
+    on_error: degrade
+
+  - id: retrieve
+    label: "Manual Retrieval"
+    agent: retrieve
+    description: "Retrieve the relevant manual sections to ground the diagnosis."
+    azure_service: "Azure AI Search"
+    on_error: degrade
+
+  - id: diagnose
+    label: "Diagnosis"
+    agent: diagnose
+    description: "Identify probable failure modes, severity and safety risk, each cited."
+    azure_service: "Azure OpenAI"
+    retries: 2
+    on_error: fail_closed
+
+  - id: risk
+    label: "Risk Scoring"
+    agent: risk
+    description: "Deterministic priority from criticality, severity and safety flags."
+    azure_service: null
+    on_error: fail_closed
+
+  - id: policy
+    label: "Policy Engine"
+    agent: policy
+    description: "Apply the versioned rule set; every finding carries a citation."
+    azure_service: null
+    on_error: fail_closed
+
+  - id: plan
+    label: "Action Planning"
+    agent: plan
+    description: "Turn findings into a concrete, bounded action plan."
+    azure_service: "Azure OpenAI"
+    retries: 1
+    on_error: fail_closed
+
+  - id: guard_output
+    label: "Output Guardrail"
+    agent: guard_output
+    description: "Screen generated text and refuse actions outside the allow-list."
+    azure_service: "Azure AI Content Safety"
+    on_error: fail_closed
+
+  - id: approval
+    label: "Human Approval"
+    agent: approval
+    description: "Hold high-priority or low-confidence plans for a person to approve."
+    azure_service: null
+    on_error: fail_closed
+
+  - id: dispatch
+    label: "Dispatch"
+    agent: dispatch
+    description: "Execute approved actions through the outbound connectors."
+    azure_service: null
+    on_error: fail_closed
+
+# Actions the planner is permitted to emit. Anything outside this list is
+# rejected by the output guardrail -- the model cannot invent new powers.
+allowed_actions:
+  - {id: create_work_order,            label: "Create work order",              connector: cmms,            reversible: true}
+  - {id: raise_purchase_request,       label: "Raise purchase request",         connector: cmms,            reversible: true}
+  - {id: notify_duty_engineer,         label: "Notify duty engineer",           connector: teams,           reversible: false}
+  - {id: notify_supervisor,            label: "Notify supervisor",              connector: teams,           reversible: false}
+  - {id: notify_planner,               label: "Notify maintenance planner",     connector: teams,           reversible: false}
+  - {id: notify_hse,                   label: "Notify HSE duty officer",        connector: teams,           reversible: false}
+  - {id: notify_oem,                   label: "Notify OEM / warranty contact",  connector: power_automate,  reversible: false}
+  - {id: freeze_asset,                 label: "Take asset out of service",      connector: cmms,            reversible: true}
+  - {id: require_permit_to_work,       label: "Require permit to work",         connector: cmms,            reversible: true}
+  - {id: schedule_statutory_inspection, label: "Schedule statutory inspection", connector: power_automate,  reversible: true}
+  - {id: deploy_containment,           label: "Deploy spill containment",       connector: teams,           reversible: false}
+  - {id: request_contingency_plan,     label: "Request contingency plan",       connector: power_automate,  reversible: true}
+  - {id: hold_inhouse_repair,          label: "Hold in-house repair",           connector: cmms,            reversible: true}
+  - {id: require_human_review,         label: "Route for human review",         connector: teams,           reversible: true}
+  - {id: log_only,                     label: "Log for trending only",          connector: none,            reversible: true}

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "comment": "AgentFlow reference flow: triage an inbound maintenance report, then route to approval only when the policy engine says a human is required. Reconnect the trigger and connector references after import.",
+  "parameters": {
+    "$connections": { "defaultValue": {}, "type": "Object" },
+    "$authentication": { "defaultValue": {}, "type": "SecureObject" }
+  },
+  "triggers": {
+    "When_a_new_email_arrives": {
+      "type": "OpenApiConnectionNotification",
+      "inputs": {
+        "host": { "connectionName": "shared_office365", "operationId": "OnNewEmailV3" },
+        "parameters": { "folderPath": "Inbox", "importance": "Any", "includeAttachments": false }
+      },
+      "splitOn": "@triggerOutputs()?['body/value']"
+    }
+  },
+  "actions": {
+    "Triage_the_signal": {
+      "runAfter": {},
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": { "connectionName": "shared_agentflow", "operationId": "TriageSignal" },
+        "parameters": {
+          "body/text": "@{triggerOutputs()?['body/subject']} - @{triggerOutputs()?['body/bodyPreview']}",
+          "body/kind": "inspection_finding",
+          "body/channel": "power_automate",
+          "body/reported_by": "@triggerOutputs()?['body/from']"
+        }
+      }
+    },
+    "Does_it_need_a_human": {
+      "runAfter": { "Triage_the_signal": ["Succeeded"] },
+      "type": "If",
+      "expression": {
+        "equals": ["@outputs('Triage_the_signal')?['body/requires_approval']", true]
+      },
+      "actions": {
+        "Start_and_wait_for_an_approval": {
+          "type": "OpenApiConnectionWebhook",
+          "inputs": {
+            "host": { "connectionName": "shared_approvals", "operationId": "StartAndWaitForAnApproval" },
+            "parameters": {
+              "approvalType": "Basic",
+              "ApprovalCreationInput/title": "@{outputs('Triage_the_signal')?['body/priority']} on @{outputs('Triage_the_signal')?['body/asset/name']}",
+              "ApprovalCreationInput/details": "@{outputs('Triage_the_signal')?['body/diagnosis/summary']}\n\nHeld because: @{outputs('Triage_the_signal')?['body/approval_reason']}",
+              "ApprovalCreationInput/assignedTo": "maintenance-supervisors@contoso.com"
+            }
+          }
+        },
+        "Record_the_decision": {
+          "runAfter": { "Start_and_wait_for_an_approval": ["Succeeded"] },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": { "connectionName": "shared_agentflow", "operationId": "DecideRun" },
+            "parameters": {
+              "run_id": "@outputs('Triage_the_signal')?['body/run_id']",
+              "body/approved": "@equals(outputs('Start_and_wait_for_an_approval')?['body/outcome'], 'Approve')",
+              "body/approver": "@outputs('Start_and_wait_for_an_approval')?['body/responses'][0]['responder']['email']"
+            }
+          }
+        }
+      },
+      "else": {
+        "actions": {
+          "Notify_that_it_was_handled": {
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": { "connectionName": "shared_teams", "operationId": "PostMessageToChannelV3" },
+              "parameters": {
+                "body/messageBody": "<b>@{outputs('Triage_the_signal')?['body/priority']}</b> raised automatically on @{outputs('Triage_the_signal')?['body/asset/name']}.<br>@{outputs('Triage_the_signal')?['body/diagnosis/summary']}"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

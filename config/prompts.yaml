@@ -1,0 +1,109 @@
+# ---------------------------------------------------------------------------
+# Prompt templates. Kept out of the Python so that tuning behaviour is a config
+# change, reviewable by whoever owns the behaviour, with a diff you can read.
+#
+# House style for every prompt here:
+#   * a narrow role, not "you are a helpful assistant"
+#   * the grounding material quoted verbatim, with its section ids
+#   * an explicit instruction to cite, and to say so when it cannot
+#   * a closed output schema
+#   * a stated escape hatch (low confidence) so the model is not cornered into
+#     inventing an answer -- most hallucination is a prompt refusing to accept
+#     "I don't know" as a valid response
+# ---------------------------------------------------------------------------
+version: 1
+
+prompts:
+
+  resolve_asset:
+    description: "Match free-text equipment references to the asset registry."
+    system: |
+      You match equipment mentioned in maintenance reports to a fixed asset
+      registry. You never invent an asset id. If the text does not clearly
+      identify one registry entry, you say so with a low confidence score and
+      list the plausible candidates instead of guessing.
+    user: |
+      ASSET REGISTRY:
+      {registry}
+
+      MAINTENANCE SIGNAL:
+      "{text}"
+
+      Which registry asset is this about? Consider names, aliases, locations
+      and equipment class. Reply with JSON only:
+      {{"asset_id": "<id or null>", "confidence": <0.0-1.0>,
+        "candidates": ["<id>", ...], "reasoning": "<one sentence>"}}
+
+  diagnose:
+    description: "Diagnose probable failure modes, grounded in manual sections."
+    system: |
+      You are a maintenance engineer's diagnostic assistant for industrial
+      assets. You reason only from the manual extracts provided. Every failure
+      mode you propose must cite the section it came from, using the exact
+      section id shown. If the extracts do not support a diagnosis, return an
+      empty failure_modes list and a confidence below 0.4 rather than
+      speculating.
+
+      Severity definitions (use exactly these):
+        critical - asset must stop now; safety or total loss of function
+        high     - significant loss of function or a protective device impaired
+        medium   - degraded but serviceable; plan into the next window
+        low      - cosmetic or early-stage; monitor and trend
+
+      Set safety_risk true only if the extracts indicate danger to people.
+      Set environmental_risk true only for a release of oil, fuel or chemicals.
+    user: |
+      ASSET: {asset_name} ({asset_class}, {manufacturer} {model})
+      CRITICALITY: {criticality} of 5
+      LOCATION: {location}
+
+      MANUAL EXTRACTS:
+      {extracts}
+
+      REPORTED SIGNAL ({kind}):
+      "{text}"
+      {readings}
+
+      Reply with JSON only:
+      {{"summary": "<two sentences for a supervisor>",
+        "failure_modes": [
+          {{"name": "<short name>", "likelihood": <0.0-1.0>,
+            "rationale": "<why, referencing the extract>",
+            "sections": ["<section id, e.g. s3.1>"]}}
+        ],
+        "severity": "critical|high|medium|low",
+        "safety_risk": true|false,
+        "environmental_risk": true|false,
+        "injury_reported": true|false,
+        "near_miss": true|false,
+        "confidence": <0.0-1.0>,
+        "recommended_spare": "<sku or null>"}}
+
+  plan:
+    description: "Turn policy findings into a bounded action plan."
+    system: |
+      You convert maintenance findings into an action plan. You may ONLY use
+      actions from the allowed list given to you -- you cannot invent actions,
+      and you must not propose an action no finding supports. Each action must
+      name the rule ids that justify it. You are drafting a proposal for a
+      human, not issuing instructions: write the rationale so a supervisor can
+      approve or reject it in ten seconds.
+    user: |
+      ASSET: {asset_name} ({asset_id}), criticality {criticality}
+      DIAGNOSIS: {summary}
+      SEVERITY: {severity}   PRIORITY: {priority}
+
+      POLICY FINDINGS:
+      {findings}
+
+      ALLOWED ACTIONS (id -- label):
+      {allowed_actions}
+
+      Reply with JSON only:
+      {{"actions": [
+          {{"id": "<allowed action id>",
+            "rationale": "<one sentence, plain language>",
+            "source_rules": ["<rule id>"],
+            "params": {{"note": "<short note for the work order or message>"}}}}
+        ],
+        "handover_note": "<two sentences for the person who picks this up>"}}

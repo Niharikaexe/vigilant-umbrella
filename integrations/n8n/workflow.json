@@ -1,0 +1,119 @@
+{
+  "name": "AgentFlow - Maintenance Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "maintenance-signal",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "Signal received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-220, 300],
+      "webhookId": "agentflow-maintenance-signal"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENTFLOW_URL || 'http://host.docker.internal:8000' }}/api/signals/sync",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.body.text, kind: $json.body.kind || 'operator_request', channel: 'api', reported_by: $json.body.reported_by }) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "triage",
+      "name": "AgentFlow triage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "version": 2 },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.requires_approval }}",
+                    "rightValue": true,
+                    "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Needs a human"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "gate",
+      "name": "Approval needed?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TEAMS_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'message', attachments: [{ contentType: 'application/vnd.microsoft.card.adaptive', content: { type: 'AdaptiveCard', version: '1.4', body: [ { type: 'TextBlock', size: 'Large', weight: 'Bolder', text: $json.priority + ' - ' + ($json.asset ? $json.asset.name : 'Unidentified asset') }, { type: 'TextBlock', wrap: true, text: $json.diagnosis.summary }, { type: 'TextBlock', wrap: true, isSubtle: true, text: 'Held because: ' + $json.approval_reason }, { type: 'FactSet', facts: ($json.findings || []).map(f => ({ title: f.rule_id, value: f.citation })) } ], actions: [ { type: 'Action.OpenUrl', title: 'Review in AgentFlow', url: ($env.AGENTFLOW_URL || 'http://localhost:8000') + '/?run=' + $json.run_id } ] } }] }) }}",
+        "options": {}
+      },
+      "id": "teams",
+      "name": "Ask a supervisor in Teams",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "outcome", "value": "auto-dispatched within policy", "type": "string" },
+            { "id": "a2", "name": "run_id", "value": "={{ $json.run_id }}", "type": "string" },
+            { "id": "a3", "name": "priority", "value": "={{ $json.priority }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "auto",
+      "name": "Auto-dispatched",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 400]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Signal received": { "main": [[{ "node": "AgentFlow triage", "type": "main", "index": 0 }]] },
+    "AgentFlow triage": { "main": [[{ "node": "Approval needed?", "type": "main", "index": 0 }]] },
+    "Approval needed?": {
+      "main": [
+        [{ "node": "Ask a supervisor in Teams", "type": "main", "index": 0 }],
+        [{ "node": "Auto-dispatched", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ask a supervisor in Teams": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
+    "Auto-dispatched": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "instanceId": "agentflow-reference-workflow" },
+  "tags": [{ "name": "agentflow" }]
+}

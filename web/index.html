@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentFlow Console</title>
+<meta name="description" content="Live console for the AgentFlow maintenance and asset operations copilot.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>&#9881;</text></svg>">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>AgentFlow</h1>
+    <span id="pipeline-name">Maintenance &amp; Asset Operations Copilot</span>
+  </div>
+  <div class="chip-row" id="service-chips"></div>
+  <button class="btn btn-ghost" id="theme-toggle" aria-label="Toggle colour theme">Theme</button>
+</header>
+
+<main>
+  <!-- ---------------- left: input ---------------- -->
+  <div class="col col-left">
+    <section class="card">
+      <h2>New signal</h2>
+      <label for="signal-text">What was reported</label>
+      <textarea id="signal-text" rows="5" placeholder="e.g. Hydraulic pump 3 on the aft deck is dripping oil from the drive shaft and the reservoir level is falling."></textarea>
+
+      <label for="signal-kind">Signal type</label>
+      <select id="signal-kind">
+        <option value="inspection_finding">Inspection finding</option>
+        <option value="operator_request">Operator request</option>
+        <option value="sensor_alert">Sensor alert</option>
+      </select>
+
+      <label for="signal-channel">Channel</label>
+      <select id="signal-channel">
+        <option value="dashboard">Dashboard</option>
+        <option value="teams">Microsoft Teams</option>
+        <option value="power_automate">Power Automate</option>
+        <option value="email">Email</option>
+        <option value="sensor">Sensor / telemetry</option>
+      </select>
+
+      <div class="btn-row">
+        <button class="btn" id="run-btn">Run pipeline</button>
+        <button class="btn btn-ghost" id="clear-btn">Clear</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Demo scenarios</h2>
+      <div class="samples" id="samples"></div>
+    </section>
+
+    <section class="card">
+      <h2>Recent runs</h2>
+      <div class="runlist" id="runs"><div class="empty">No runs yet.</div></div>
+    </section>
+  </div>
+
+  <!-- ---------------- centre: graph + trace ---------------- -->
+  <div class="col col-centre">
+    <section class="stats" id="stats" aria-label="Run statistics">
+      <div class="stat"><div class="n" id="stat-runs">0</div><div class="l">Runs</div></div>
+      <div class="stat"><div class="n" id="stat-hold">0</div><div class="l">Awaiting approval</div></div>
+      <div class="stat"><div class="n" id="stat-p1">0</div><div class="l">P1 raised</div></div>
+      <div class="stat"><div class="n" id="stat-actions">0</div><div class="l">Actions dispatched</div></div>
+    </section>
+
+    <section class="card">
+      <h2>Agent pipeline</h2>
+      <div class="graph" id="graph"></div>
+    </section>
+
+    <section class="card">
+      <h2>Live trace</h2>
+      <div class="trace" id="trace"><div class="empty">Submit a signal to see the pipeline execute.</div></div>
+    </section>
+  </div>
+
+  <!-- ---------------- right: result ---------------- -->
+  <div class="col col-right">
+    <section class="card" id="result">
+      <h2>Result</h2>
+      <div class="empty">No run selected.</div>
+    </section>
+  </div>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

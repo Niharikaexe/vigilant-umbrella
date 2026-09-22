@@ -1,0 +1,18 @@
+{
+  "properties": {
+    "connectionParameters": {
+      "api_key": {
+        "type": "securestring",
+        "uiDefinition": {
+          "displayName": "AgentFlow API key",
+          "description": "The value of AGENTFLOW_API_KEY on your deployment. Stored by Power Platform as a secure connection parameter -- never put it in the flow definition.",
+          "tooltip": "Provide the AgentFlow API key",
+          "constraints": { "tabIndex": 2, "clearText": false, "required": "true" }
+        }
+      }
+    },
+    "iconBrandColor": "#2a78d6",
+    "capabilities": [],
+    "policyTemplateInstances": []
+  }
+}

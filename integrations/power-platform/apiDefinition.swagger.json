@@ -1,0 +1,180 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "AgentFlow Maintenance Copilot",
+    "description": "Turns an unstructured maintenance signal into a grounded diagnosis, a policy-checked priority and a bounded action plan. Every verdict carries a citation.",
+    "version": "1.0"
+  },
+  "host": "REPLACE-WITH-YOUR-HOST",
+  "basePath": "/",
+  "schemes": ["https"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "paths": {
+    "/api/signals/sync": {
+      "post": {
+        "summary": "Triage a maintenance signal",
+        "description": "Submit what was reported and get back the diagnosis, priority and proposed actions. Use this one from a Copilot Studio agent action.",
+        "operationId": "TriageSignal",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/SignalRequest" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Triage complete", "schema": { "$ref": "#/definitions/RunResult" } },
+          "401": { "description": "Missing or invalid API key" },
+          "422": { "description": "The signal could not be processed" }
+        }
+      }
+    },
+    "/api/runs/{run_id}": {
+      "get": {
+        "summary": "Get a run",
+        "description": "Fetch the current state of a run, including whether it is still waiting for a human decision.",
+        "operationId": "GetRun",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "type": "string", "x-ms-summary": "Run ID" }
+        ],
+        "responses": {
+          "200": { "description": "The run", "schema": { "$ref": "#/definitions/RunResult" } },
+          "404": { "description": "No such run" }
+        }
+      }
+    },
+    "/api/runs/{run_id}/approve": {
+      "post": {
+        "summary": "Approve or reject a held plan",
+        "description": "Apply a human decision. Approving dispatches the plan; rejecting dispatches nothing. Call this from the Power Automate approval branch.",
+        "operationId": "DecideRun",
+        "parameters": [
+          { "name": "run_id", "in": "path", "required": true, "type": "string", "x-ms-summary": "Run ID" },
+          { "name": "body", "in": "body", "required": true, "schema": { "$ref": "#/definitions/ApprovalRequest" } }
+        ],
+        "responses": {
+          "200": { "description": "Decision applied", "schema": { "$ref": "#/definitions/RunResult" } },
+          "409": { "description": "The run is not awaiting approval" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "SignalRequest": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "What was reported, in plain language.",
+          "x-ms-summary": "Reported issue"
+        },
+        "kind": {
+          "type": "string",
+          "description": "The type of signal.",
+          "default": "operator_request",
+          "enum": ["inspection_finding", "sensor_alert", "operator_request"],
+          "x-ms-summary": "Signal type"
+        },
+        "channel": {
+          "type": "string",
+          "description": "Where it came from.",
+          "default": "power_automate",
+          "enum": ["dashboard", "teams", "power_automate", "email", "sensor", "api"],
+          "x-ms-summary": "Channel"
+        },
+        "asset_hint": {
+          "type": "string",
+          "description": "Asset id or name, if the caller already knows it.",
+          "x-ms-summary": "Asset hint",
+          "x-ms-visibility": "advanced"
+        },
+        "reported_by": {
+          "type": "string",
+          "description": "Who reported it. Redacted before any model sees it.",
+          "x-ms-summary": "Reported by",
+          "x-ms-visibility": "advanced"
+        }
+      }
+    },
+    "ApprovalRequest": {
+      "type": "object",
+      "required": ["approved", "approver"],
+      "properties": {
+        "approved": { "type": "boolean", "x-ms-summary": "Approved" },
+        "approver": { "type": "string", "x-ms-summary": "Approver" },
+        "rejected_actions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "x-ms-summary": "Action ids to drop",
+          "x-ms-visibility": "advanced"
+        }
+      }
+    },
+    "RunResult": {
+      "type": "object",
+      "properties": {
+        "run_id": { "type": "string", "x-ms-summary": "Run ID" },
+        "status": { "type": "string", "x-ms-summary": "Status" },
+        "priority": { "type": "string", "x-ms-summary": "Priority" },
+        "sla_due_at": { "type": "string", "x-ms-summary": "Respond by" },
+        "requires_approval": { "type": "boolean", "x-ms-summary": "Needs approval" },
+        "approval_reason": { "type": "string", "x-ms-summary": "Why approval is needed" },
+        "asset": {
+          "type": "object",
+          "x-ms-summary": "Asset",
+          "properties": {
+            "id": { "type": "string", "x-ms-summary": "Asset ID" },
+            "name": { "type": "string", "x-ms-summary": "Asset name" },
+            "site": { "type": "string", "x-ms-summary": "Site" },
+            "criticality": { "type": "integer", "x-ms-summary": "Criticality" }
+          }
+        },
+        "diagnosis": {
+          "type": "object",
+          "x-ms-summary": "Diagnosis",
+          "properties": {
+            "summary": { "type": "string", "x-ms-summary": "Summary" },
+            "severity": { "type": "string", "x-ms-summary": "Severity" },
+            "confidence": { "type": "number", "x-ms-summary": "Confidence" },
+            "safety_risk": { "type": "boolean", "x-ms-summary": "Safety risk" },
+            "environmental_risk": { "type": "boolean", "x-ms-summary": "Environmental risk" },
+            "recommended_spare": { "type": "string", "x-ms-summary": "Suggested spare" }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "x-ms-summary": "Policy findings",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule_id": { "type": "string", "x-ms-summary": "Rule" },
+              "message": { "type": "string", "x-ms-summary": "Finding" },
+              "citation": { "type": "string", "x-ms-summary": "Policy reference" },
+              "priority": { "type": "string", "x-ms-summary": "Priority" }
+            }
+          }
+        },
+        "actions": {
+          "type": "array",
+          "x-ms-summary": "Proposed actions",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "x-ms-summary": "Action ID" },
+              "label": { "type": "string", "x-ms-summary": "Action" },
+              "rationale": { "type": "string", "x-ms-summary": "Why" },
+              "status": { "type": "string", "x-ms-summary": "Status" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "api_key": { "type": "apiKey", "in": "header", "name": "X-API-Key" }
+  },
+  "security": [{ "api_key": [] }]
+}

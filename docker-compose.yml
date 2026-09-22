@@ -1,0 +1,39 @@
+services:
+  agentflow:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      # Everything optional. With nothing set the stack runs fully simulated.
+      AGENTFLOW_LLM_PROVIDER: ${AGENTFLOW_LLM_PROVIDER:-simulated}
+      AGENTFLOW_STEP_DELAY_MS: ${AGENTFLOW_STEP_DELAY_MS:-320}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-gpt-4o-mini}
+      AZURE_LANGUAGE_ENDPOINT: ${AZURE_LANGUAGE_ENDPOINT:-}
+      AZURE_LANGUAGE_API_KEY: ${AZURE_LANGUAGE_API_KEY:-}
+      AZURE_TRANSLATOR_API_KEY: ${AZURE_TRANSLATOR_API_KEY:-}
+      AZURE_CONTENT_SAFETY_ENDPOINT: ${AZURE_CONTENT_SAFETY_ENDPOINT:-}
+      AZURE_CONTENT_SAFETY_API_KEY: ${AZURE_CONTENT_SAFETY_API_KEY:-}
+      TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL:-}
+      POWER_AUTOMATE_WEBHOOK_URL: ${POWER_AUTOMATE_WEBHOOK_URL:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Optional: the visual orchestrator. `docker compose --profile n8n up`
+  n8n:
+    image: n8nio/n8n:latest
+    profiles: ["n8n"]
+    ports: ["5678:5678"]
+    environment:
+      AGENTFLOW_URL: http://agentflow:8000
+      TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL:-}
+      N8N_SECURE_COOKIE: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on: [agentflow]
+
+volumes:
+  n8n_data:

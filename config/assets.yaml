@@ -1,0 +1,117 @@
+# ---------------------------------------------------------------------------
+# Asset registry (seed data). In production this is a view over your EAM/CMMS
+# (SAP PM, Maximo, Ultimo, Fiix...) pulled through the `cmms` connector; the
+# shape below is the canonical internal model everything else works against.
+#
+# Deliberately multi-industry: the same pipeline runs for a shipyard, a plant,
+# a wind farm or a building portfolio. Only this file changes.
+# ---------------------------------------------------------------------------
+version: 1
+
+sites:
+  - {id: SITE-A, name: "Assembly Hall North", timezone: "Europe/Amsterdam"}
+  - {id: SITE-B, name: "Dry Dock 2",          timezone: "Europe/Amsterdam"}
+  - {id: SITE-C, name: "Outfitting Quay",     timezone: "Europe/Amsterdam"}
+
+# criticality: 1 (nice to have) .. 5 (production stops / safety critical)
+assets:
+  - id: PMP-003
+    name: "Hydraulic Power Unit 3"
+    class: hydraulic_pump
+    manufacturer: "Bosch Rexroth"
+    model: "A10VSO-71"
+    site: SITE-B
+    location: "Aft deck, frame 42"
+    criticality: 5
+    commissioned: "2019-04-11"
+    aliases: ["hydraulic pump 3", "hpu 3", "pump three", "aft deck pump"]
+
+  - id: CRN-002
+    name: "Gantry Crane 2"
+    class: crane
+    manufacturer: "Konecranes"
+    model: "SMARTON 40t"
+    site: SITE-A
+    location: "Bay 3 runway"
+    criticality: 5
+    commissioned: "2016-09-30"
+    aliases: ["crane 2", "gantry 2", "overhead crane bay 3"]
+
+  - id: GEN-014
+    name: "Emergency Generator 14"
+    class: diesel_generator
+    manufacturer: "Caterpillar"
+    model: "C18 750kVA"
+    site: SITE-A
+    location: "Plant room B"
+    criticality: 4
+    commissioned: "2021-01-18"
+    aliases: ["generator 14", "emergency genset", "gen 14", "backup generator"]
+
+  - id: CMP-007
+    name: "Air Compressor 7"
+    class: air_compressor
+    manufacturer: "Atlas Copco"
+    model: "GA 90 VSD+"
+    site: SITE-A
+    location: "Compressor house"
+    criticality: 3
+    commissioned: "2020-06-02"
+    aliases: ["compressor 7", "air comp 7", "atlas copco 7"]
+
+  - id: WLD-021
+    name: "Robotic Welding Cell 21"
+    class: welding_robot
+    manufacturer: "ABB"
+    model: "IRB 1520ID"
+    site: SITE-A
+    location: "Panel line"
+    criticality: 4
+    commissioned: "2022-03-14"
+    aliases: ["welding cell 21", "weld robot 21", "panel line robot"]
+
+  - id: HVC-001
+    name: "Paint Hall Air Handling Unit 1"
+    class: hvac_ahu
+    manufacturer: "Systemair"
+    model: "DV 150"
+    site: SITE-C
+    location: "Paint hall roof"
+    criticality: 3
+    commissioned: "2018-11-05"
+    aliases: ["ahu 1", "air handling unit 1", "paint hall hvac"]
+
+  - id: CNV-009
+    name: "Plate Transfer Conveyor 9"
+    class: conveyor
+    manufacturer: "Interroll"
+    model: "PC-1200"
+    site: SITE-A
+    location: "Cutting shop outfeed"
+    criticality: 2
+    commissioned: "2017-07-21"
+    aliases: ["conveyor 9", "plate conveyor", "outfeed belt"]
+
+  - id: WNC-004
+    name: "Mooring Winch 4"
+    class: winch
+    manufacturer: "MacGregor"
+    model: "MW-25"
+    site: SITE-C
+    location: "Quayside bollard 4"
+    criticality: 4
+    commissioned: "2015-05-19"
+    aliases: ["winch 4", "mooring winch", "quay winch 4"]
+
+# Spare parts catalogue -- drives the "can we actually fix this?" branch.
+spares:
+  - {sku: "SEAL-A10-KIT",  description: "A10VSO shaft seal kit",        asset_classes: [hydraulic_pump], stock: 4,  lead_time_days: 3}
+  - {sku: "HYD-HOSE-32",   description: "32mm hydraulic hose assembly", asset_classes: [hydraulic_pump, winch], stock: 0, lead_time_days: 12}
+  - {sku: "BRK-PAD-40T",   description: "Crane brake pad set 40t",      asset_classes: [crane], stock: 2,  lead_time_days: 7}
+  - {sku: "WIRE-ROPE-24",  description: "24mm wire rope, 60m",         asset_classes: [crane, winch], stock: 1, lead_time_days: 21}
+  - {sku: "FLT-AIR-C18",   description: "C18 air filter element",       asset_classes: [diesel_generator], stock: 9, lead_time_days: 2}
+  - {sku: "INJ-C18",       description: "C18 fuel injector",            asset_classes: [diesel_generator], stock: 0, lead_time_days: 28}
+  - {sku: "CMP-ELEM-90",   description: "GA90 compressor element",      asset_classes: [air_compressor], stock: 1, lead_time_days: 35}
+  - {sku: "TORCH-1520",    description: "IRB1520 welding torch neck",   asset_classes: [welding_robot], stock: 5, lead_time_days: 5}
+  - {sku: "BELT-PC1200",   description: "PC-1200 conveyor belt 12m",    asset_classes: [conveyor], stock: 2, lead_time_days: 9}
+  - {sku: "FLT-BAG-DV150", description: "DV150 bag filter set",         asset_classes: [hvac_ahu], stock: 6, lead_time_days: 4}

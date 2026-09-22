@@ -1,0 +1,174 @@
+# ---------------------------------------------------------------------------
+# Maintenance policy rules.
+#
+# These are deliberately NOT the model's job. The LLM diagnoses and explains;
+# this deterministic, versioned, unit-testable rule set decides what must
+# happen. Every rule carries a `citation` so no action is ever taken without a
+# traceable reason -- the single most important property when an auditor or an
+# HSE officer asks "why did the machine decide that?".
+#
+# Note the `asset_resolved == true` guard on the OPS rules: we never raise a
+# work order against equipment the copilot could not identify. AIQ-002 routes
+# that case to a person instead.
+#
+# `when` is a restricted expression evaluated against the run context. Only
+# literals, comparisons, boolean ops and whitelisted helpers are allowed --
+# no attribute access, imports, or calls out (see agentflow/rules.py).
+# ---------------------------------------------------------------------------
+version: 1
+
+policy:
+  base_timezone: "Europe/Amsterdam"
+  # Priority -> response SLA in hours.
+  sla_hours: {P1: 2, P2: 8, P3: 48, P4: 168}
+  # Anything at or above this priority cannot be actioned without a human.
+  human_approval_at_or_above: P2
+  # Confidence floor below which we always ask a human, whatever the priority.
+  confidence_floor: 0.55
+  default_approver_group: "maintenance-supervisors"
+  hse_approver_group: "hse-duty-officer"
+
+rules:
+  - id: SAF-001
+    description: Any signal indicating injury or near-miss goes to HSE immediately.
+    when: "injury_reported == true or near_miss == true"
+    severity: blocker
+    priority: P1
+    message: "Personal safety event reported -- HSE duty officer must be engaged before any maintenance action."
+    actions: [notify_hse, freeze_asset]
+    citation: "HSE Procedure s2.1 -- Reporting of Injuries and Near Misses"
+
+  - id: SAF-002
+    description: Safety-critical failure modes on high-criticality assets stop the asset.
+    when: "safety_risk == true and asset_criticality >= 4"
+    severity: blocker
+    priority: P1
+    message: "Safety-critical fault on a criticality-{asset_criticality} asset -- lock out and tag out before work."
+    actions: [freeze_asset, notify_duty_engineer, require_permit_to_work]
+    citation: "HSE Procedure s9.1 -- Lock-Out/Tag-Out for Safety-Critical Defects"
+
+  - id: SAF-003
+    description: Lifting equipment defects require a competent-person re-inspection.
+    when: "asset_class in ['crane', 'winch'] and severity in ['critical', 'high']"
+    severity: blocker
+    priority: P1
+    message: "Defect on lifting equipment -- statutory re-examination required before return to service."
+    actions: [freeze_asset, schedule_statutory_inspection]
+    citation: "Lifting Equipment Standard s4.4 -- Thorough Examination After Defect"
+
+  - id: OPS-001
+    description: Critical faults on production-critical assets are P1.
+    when: "asset_resolved == true and severity == 'critical' and asset_criticality >= 4"
+    severity: blocker
+    priority: P1
+    message: "Critical fault on a production-stopping asset -- immediate response."
+    actions: [notify_duty_engineer, create_work_order]
+    citation: "Maintenance Policy s3.2 -- Priority Matrix"
+
+  - id: OPS-001B
+    description: Critical faults on lower-criticality assets still need same-day attention.
+    when: "asset_resolved == true and severity == 'critical' and asset_criticality <= 3"
+    severity: warning
+    priority: P2
+    message: "Critical fault on a criticality-{asset_criticality} asset."
+    actions: [create_work_order, notify_supervisor]
+    citation: "Maintenance Policy s3.2 -- Priority Matrix"
+
+  - id: OPS-002
+    description: High-severity faults on important assets are P2.
+    when: "asset_resolved == true and severity == 'high' and asset_criticality >= 3"
+    severity: warning
+    priority: P2
+    message: "High-severity fault on a criticality-{asset_criticality} asset."
+    actions: [create_work_order, notify_supervisor]
+    citation: "Maintenance Policy s3.2 -- Priority Matrix"
+
+  - id: OPS-002B
+    description: High-severity faults on minor assets are planned work.
+    when: "asset_resolved == true and severity == 'high' and asset_criticality <= 2"
+    severity: info
+    priority: P3
+    message: "High-severity fault on a low-criticality asset -- plan the repair."
+    actions: [create_work_order]
+    citation: "Maintenance Policy s3.2 -- Priority Matrix"
+
+  - id: OPS-003
+    description: Medium faults are planned into the next maintenance window.
+    when: "asset_resolved == true and severity == 'medium'"
+    severity: info
+    priority: P3
+    message: "Medium-severity fault -- schedule into the next planned window."
+    actions: [create_work_order]
+    citation: "Maintenance Policy s3.3 -- Planned Maintenance Windows"
+
+  - id: OPS-004
+    description: Low-severity findings are logged and trended, not actioned.
+    when: "asset_resolved == true and severity == 'low' and safety_risk == false"
+    severity: info
+    priority: P4
+    message: "Low-severity finding -- logged for condition trending."
+    actions: [log_only]
+    citation: "Maintenance Policy s3.4 -- Condition Monitoring and Trending"
+
+  - id: SUP-001
+    description: A required spare that is out of stock blocks the repair.
+    when: "spare_required == true and spare_in_stock == false"
+    severity: warning
+    priority: P2
+    message: "Required spare {spare_sku} is out of stock (lead time {spare_lead_time_days} days) -- raise procurement."
+    actions: [raise_purchase_request, notify_planner]
+    citation: "Spare Parts Policy s5.1 -- Stock-Out Escalation"
+
+  - id: SUP-002
+    description: Long-lead spares on critical assets need a mitigation plan.
+    when: "spare_lead_time_days >= 14 and asset_criticality >= 4"
+    severity: warning
+    priority: P2
+    message: "Lead time of {spare_lead_time_days} days on a criticality-{asset_criticality} asset -- a contingency plan is required."
+    actions: [notify_planner, request_contingency_plan]
+    citation: "Spare Parts Policy s5.3 -- Long-Lead Items on Critical Assets"
+
+  - id: ENV-001
+    description: Any spill or emission risk triggers the environmental procedure.
+    when: "environmental_risk == true"
+    severity: blocker
+    priority: P1
+    message: "Environmental release risk identified -- containment procedure applies."
+    actions: [notify_hse, deploy_containment]
+    citation: "Environmental Procedure s6.2 -- Spill Containment"
+
+  - id: WAR-001
+    description: Faults on in-warranty assets must not be self-repaired.
+    when: "in_warranty == true and severity in ['critical', 'high']"
+    severity: warning
+    priority: P2
+    message: "Asset is within its warranty period -- engage the OEM rather than repairing in-house."
+    actions: [notify_oem, hold_inhouse_repair]
+    citation: "Contracts Manual s8.1 -- Warranty Preservation"
+
+  - id: AIQ-001
+    description: Low diagnostic confidence always needs a human.
+    when: "confidence < 0.55"
+    severity: warning
+    priority: P2
+    message: "Diagnostic confidence {confidence} is below the 0.55 floor -- human verification required."
+    actions: [require_human_review]
+    citation: "AI Assurance Policy s3.1 -- Confidence Floor"
+
+  - id: AIQ-002
+    description: An unresolved asset cannot be actioned automatically.
+    when: "asset_resolved == false"
+    severity: blocker
+    priority: P2
+    message: "The reported asset could not be matched to the registry -- a human must identify it."
+    actions: [require_human_review]
+    citation: "AI Assurance Policy s3.4 -- No Action on Unidentified Assets"
+
+  - id: AIQ-003
+    description: A diagnosis with no supporting manual citation is advisory only.
+    when: "citation_count == 0"
+    severity: warning
+    priority: P3
+    message: "No supporting documentation was retrieved -- treat this diagnosis as advisory."
+    actions: [require_human_review]
+    citation: "AI Assurance Policy s3.2 -- Grounding Requirement"
