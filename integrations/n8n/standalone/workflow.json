@@ -1,0 +1,534 @@
+{
+  "name": "AgentFlow - Maintenance Triage (standalone)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "maintenance",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "signal-received",
+      "name": "Signal received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -660,
+        340
+      ],
+      "webhookId": "agentflow-standalone-maintenance",
+      "notes": "POST { \"text\": \"...\", \"readings\": { \"vibration_mm_s\": 12.9 } }"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load config -- the only node you edit to make this yours.\n//\n// CONFIG is replaced at build time with the contents of data/config.json, so the\n// exported\n// workflow stays a single importable file with no external dependencies.\n// Downstream nodes read it back with $('Load config').first().json.config\n// rather than passing it along, so the payload stays small.\n\nconst CONFIG = {\n  \"policy\": {\n    \"slaHours\": {\n      \"P1\": 2,\n      \"P2\": 8,\n      \"P3\": 48,\n      \"P4\": 168\n    },\n    \"humanApprovalAtOrAbove\": \"P2\",\n    \"confidenceFloor\": 0.55,\n    \"assetConfidenceFloor\": 0.45\n  },\n  \"assets\": [\n    {\n      \"id\": \"PMP-003\",\n      \"name\": \"Hydraulic Power Unit 3\",\n      \"class\": \"hydraulic_pump\",\n      \"site\": \"Dry Dock 2\",\n      \"criticality\": 5,\n      \"aliases\": [\n        \"hydraulic pump 3\",\n        \"hpu 3\",\n        \"pump three\",\n        \"aft deck pump\"\n      ]\n    },\n    {\n      \"id\": \"CRN-002\",\n      \"name\": \"Gantry Crane 2\",\n      \"class\": \"crane\",\n      \"site\": \"Assembly Hall North\",\n      \"criticality\": 5,\n      \"aliases\": [\n        \"crane 2\",\n        \"gantry 2\",\n        \"overhead crane\"\n      ]\n    },\n    {\n      \"id\": \"GEN-014\",\n      \"name\": \"Emergency Generator 14\",\n      \"class\": \"diesel_generator\",\n      \"site\": \"Assembly Hall North\",\n      \"criticality\": 4,\n      \"aliases\": [\n        \"generator 14\",\n        \"emergency genset\",\n        \"backup generator\"\n      ]\n    },\n    {\n      \"id\": \"CMP-007\",\n      \"name\": \"Air Compressor 7\",\n      \"class\": \"air_compressor\",\n      \"site\": \"Assembly Hall North\",\n      \"criticality\": 3,\n      \"aliases\": [\n        \"compressor 7\",\n        \"air comp 7\"\n      ]\n    },\n    {\n      \"id\": \"WLD-021\",\n      \"name\": \"Robotic Welding Cell 21\",\n      \"class\": \"welding_robot\",\n      \"site\": \"Assembly Hall North\",\n      \"criticality\": 4,\n      \"aliases\": [\n        \"welding cell 21\",\n        \"weld robot 21\",\n        \"panel line robot\"\n      ]\n    },\n    {\n      \"id\": \"CNV-009\",\n      \"name\": \"Plate Transfer Conveyor 9\",\n      \"class\": \"conveyor\",\n      \"site\": \"Assembly Hall North\",\n      \"criticality\": 2,\n      \"aliases\": [\n        \"conveyor 9\",\n        \"plate conveyor\",\n        \"outfeed belt\"\n      ]\n    },\n    {\n      \"id\": \"HVC-001\",\n      \"name\": \"Paint Hall Air Handling Unit 1\",\n      \"class\": \"hvac_ahu\",\n      \"site\": \"Outfitting Quay\",\n      \"criticality\": 3,\n      \"aliases\": [\n        \"ahu 1\",\n        \"air handling unit 1\",\n        \"paint hall hvac\"\n      ]\n    },\n    {\n      \"id\": \"WNC-004\",\n      \"name\": \"Mooring Winch 4\",\n      \"class\": \"winch\",\n      \"site\": \"Outfitting Quay\",\n      \"criticality\": 4,\n      \"aliases\": [\n        \"winch 4\",\n        \"mooring winch\"\n      ]\n    }\n  ],\n  \"spares\": [\n    {\n      \"sku\": \"SEAL-A10-KIT\",\n      \"classes\": [\n        \"hydraulic_pump\"\n      ],\n      \"stock\": 4,\n      \"leadTimeDays\": 3\n    },\n    {\n      \"sku\": \"BRK-PAD-40T\",\n      \"classes\": [\n        \"crane\"\n      ],\n      \"stock\": 2,\n      \"leadTimeDays\": 7\n    },\n    {\n      \"sku\": \"WIRE-ROPE-24\",\n      \"classes\": [\n        \"crane\",\n        \"winch\"\n      ],\n      \"stock\": 1,\n      \"leadTimeDays\": 21\n    },\n    {\n      \"sku\": \"INJ-C18\",\n      \"classes\": [\n        \"diesel_generator\"\n      ],\n      \"stock\": 0,\n      \"leadTimeDays\": 28\n    },\n    {\n      \"sku\": \"CMP-ELEM-90\",\n      \"classes\": [\n        \"air_compressor\"\n      ],\n      \"stock\": 1,\n      \"leadTimeDays\": 35\n    },\n    {\n      \"sku\": \"BELT-PC1200\",\n      \"classes\": [\n        \"conveyor\"\n      ],\n      \"stock\": 2,\n      \"leadTimeDays\": 9\n    },\n    {\n      \"sku\": \"FLT-BAG-DV150\",\n      \"classes\": [\n        \"hvac_ahu\"\n      ],\n      \"stock\": 6,\n      \"leadTimeDays\": 4\n    }\n  ],\n  \"manuals\": [\n    {\n      \"docId\": \"MAN-HYD-A10VSO\",\n      \"section\": \"s3.1\",\n      \"heading\": \"Shaft Seal Leakage\",\n      \"classes\": [\n        \"hydraulic_pump\"\n      ],\n      \"text\": \"Oil weeping at the drive shaft indicates shaft seal wear. A steady drip rather than a film means the seal has failed and the unit must be taken out of service. Replace with seal kit SEAL-A10-KIT. Running the pump with a failed shaft seal risks an oil release to the deck or to water.\"\n    },\n    {\n      \"docId\": \"MAN-HYD-A10VSO\",\n      \"section\": \"s3.4\",\n      \"heading\": \"Pressure Loss Under Load\",\n      \"classes\": [\n        \"hydraulic_pump\"\n      ],\n      \"text\": \"Gradual loss of system pressure under load with rising case-drain flow points to worn pistons or a damaged swash plate. Continued operation accelerates wear and can seize the rotary group. Overhaul is required; this is not a field repair.\"\n    },\n    {\n      \"docId\": \"MAN-CRN-SMARTON\",\n      \"section\": \"s4.2\",\n      \"heading\": \"Hoist Brake Performance\",\n      \"classes\": [\n        \"crane\"\n      ],\n      \"text\": \"Any increase in load drift after the brake sets, or a grinding noise during braking, means brake pad wear or a contaminated disc. A crane that drifts under load is unsafe to operate and must be taken out of service immediately. Replace pads as a set (BRK-PAD-40T). A statutory thorough examination is required before return to service.\"\n    },\n    {\n      \"docId\": \"MAN-CRN-SMARTON\",\n      \"section\": \"s4.5\",\n      \"heading\": \"Wire Rope Discard Criteria\",\n      \"classes\": [\n        \"crane\",\n        \"winch\"\n      ],\n      \"text\": \"Discard the rope when broken wires exceed 10 in any 6d length, on localised diameter reduction over 7 percent, on visible corrosion pitting, or on any core protrusion or kinking. Rope defects are safety critical: no lifting operation may continue. Replacement rope is WIRE-ROPE-24.\"\n    },\n    {\n      \"docId\": \"MAN-GEN-C18\",\n      \"section\": \"s2.3\",\n      \"heading\": \"Failure to Start on Demand\",\n      \"classes\": [\n        \"diesel_generator\"\n      ],\n      \"text\": \"An emergency set that fails a start test has lost its protective function. Check starting batteries under load, fuel supply and air inlet restriction first. An emergency generator that will not start is treated as a critical defect whether or not the site is currently on mains power.\"\n    },\n    {\n      \"docId\": \"MAN-GEN-C18\",\n      \"section\": \"s2.6\",\n      \"heading\": \"Black Smoke and Power Loss\",\n      \"classes\": [\n        \"diesel_generator\"\n      ],\n      \"text\": \"Black exhaust smoke with reduced output indicates incomplete combustion, most commonly a restricted air filter or failing injectors (INJ-C18). Check inlet restriction before condemning injectors. Injector replacement is a long-lead item.\"\n    },\n    {\n      \"docId\": \"MAN-CMP-GA90\",\n      \"section\": \"s3.2\",\n      \"heading\": \"High Element Outlet Temperature\",\n      \"classes\": [\n        \"air_compressor\"\n      ],\n      \"text\": \"Element outlet temperature above 110C trips the unit. Common causes are low oil level, a blocked oil cooler, a failed thermostatic valve, or high ambient temperature. Repeated high-temperature trips shorten element life. The compressor element CMP-ELEM-90 is a long-lead item.\"\n    },\n    {\n      \"docId\": \"MAN-WLD-IRB1520\",\n      \"section\": \"s2.4\",\n      \"heading\": \"Weld Seam Deviation\",\n      \"classes\": [\n        \"welding_robot\"\n      ],\n      \"text\": \"Progressive deviation of the weld seam indicates torch neck deformation, a shifted tool centre point, or worn axis gearboxes. Recalibrate the tool centre point before replacing mechanical parts. Deviating welds on structural joints are a quality escape and must be quarantined.\"\n    },\n    {\n      \"docId\": \"MAN-WLD-IRB1520\",\n      \"section\": \"s3.1\",\n      \"heading\": \"Axis Brake Fault\",\n      \"classes\": [\n        \"welding_robot\"\n      ],\n      \"text\": \"A brake fault on any axis means the arm can drop under gravity when powered down. The cell must be isolated and no one may enter the working envelope until the brake is proven. This is a safety critical fault.\"\n    },\n    {\n      \"docId\": \"MAN-GEN-PLANT\",\n      \"section\": \"s2.1\",\n      \"heading\": \"Conveyor Belt Tracking and Damage\",\n      \"classes\": [\n        \"conveyor\"\n      ],\n      \"text\": \"A belt running off-centre wears the edge and can tear. Check idler alignment and material loading before adjusting tracking. A torn belt BELT-PC1200 stops material flow but is not usually a safety issue unless personnel access the pinch points.\"\n    },\n    {\n      \"docId\": \"MAN-GEN-PLANT\",\n      \"section\": \"s2.4\",\n      \"heading\": \"Conveyor Emergency Stop Integrity\",\n      \"classes\": [\n        \"conveyor\"\n      ],\n      \"text\": \"A pull-cord or emergency stop that does not stop the belt is a safety critical defect. The conveyor must not run until it is restored.\"\n    },\n    {\n      \"docId\": \"MAN-GEN-PLANT\",\n      \"section\": \"s3.6\",\n      \"heading\": \"Fan Bearing Vibration\",\n      \"classes\": [\n        \"hvac_ahu\",\n        \"conveyor\"\n      ],\n      \"text\": \"Rising fan bearing vibration precedes failure by weeks. Trend it. Above 7.1 mm/s RMS plan a bearing change at the next window; above 11 mm/s RMS stop the machine.\"\n    },\n    {\n      \"docId\": \"MAN-GEN-PLANT\",\n      \"section\": \"s4.3\",\n      \"heading\": \"Mooring Winch Brake Holding Capacity\",\n      \"classes\": [\n        \"winch\"\n      ],\n      \"text\": \"A mooring winch brake that renders below its design holding load is a severe safety hazard: a parted line under tension has a lethal snap-back zone. Take the winch out of service and re-test the brake holding capacity.\"\n    }\n  ],\n  \"rules\": [\n    {\n      \"id\": \"SAF-001\",\n      \"when\": \"injury\",\n      \"priority\": \"P1\",\n      \"severity\": \"blocker\",\n      \"message\": \"Personal safety event reported -- HSE duty officer must be engaged before any maintenance action.\",\n      \"actions\": [\n        \"notify_hse\",\n        \"freeze_asset\"\n      ],\n      \"citation\": \"HSE Procedure s2.1 -- Reporting of Injuries and Near Misses\"\n    },\n    {\n      \"id\": \"SAF-002\",\n      \"when\": \"safetyRisk && criticality >= 4\",\n      \"priority\": \"P1\",\n      \"severity\": \"blocker\",\n      \"message\": \"Safety-critical fault on a criticality-{criticality} asset -- lock out and tag out before work.\",\n      \"actions\": [\n        \"freeze_asset\",\n        \"notify_duty_engineer\",\n        \"require_permit_to_work\"\n      ],\n      \"citation\": \"HSE Procedure s9.1 -- Lock-Out/Tag-Out\"\n    },\n    {\n      \"id\": \"SAF-003\",\n      \"when\": \"isLifting && (severity == 'critical' || severity == 'high')\",\n      \"priority\": \"P1\",\n      \"severity\": \"blocker\",\n      \"message\": \"Defect on lifting equipment -- statutory re-examination required before return to service.\",\n      \"actions\": [\n        \"freeze_asset\",\n        \"schedule_statutory_inspection\"\n      ],\n      \"citation\": \"Lifting Equipment Standard s4.4 -- Thorough Examination After Defect\"\n    },\n    {\n      \"id\": \"ENV-001\",\n      \"when\": \"environmentalRisk\",\n      \"priority\": \"P1\",\n      \"severity\": \"blocker\",\n      \"message\": \"Environmental release risk identified -- containment procedure applies.\",\n      \"actions\": [\n        \"notify_hse\",\n        \"deploy_containment\"\n      ],\n      \"citation\": \"Environmental Procedure s6.2 -- Spill Containment\"\n    },\n    {\n      \"id\": \"OPS-001\",\n      \"when\": \"resolved && severity == 'critical' && criticality >= 4\",\n      \"priority\": \"P1\",\n      \"severity\": \"blocker\",\n      \"message\": \"Critical fault on a production-stopping asset -- immediate response.\",\n      \"actions\": [\n        \"notify_duty_engineer\",\n        \"create_work_order\"\n      ],\n      \"citation\": \"Maintenance Policy s3.2 -- Priority Matrix\"\n    },\n    {\n      \"id\": \"OPS-002\",\n      \"when\": \"resolved && severity == 'critical' && criticality <= 3\",\n      \"priority\": \"P2\",\n      \"severity\": \"warning\",\n      \"message\": \"Critical fault on a criticality-{criticality} asset.\",\n      \"actions\": [\n        \"create_work_order\",\n        \"notify_supervisor\"\n      ],\n      \"citation\": \"Maintenance Policy s3.2 -- Priority Matrix\"\n    },\n    {\n      \"id\": \"OPS-003\",\n      \"when\": \"resolved && severity == 'high' && criticality >= 3\",\n      \"priority\": \"P2\",\n      \"severity\": \"warning\",\n      \"message\": \"High-severity fault on a criticality-{criticality} asset.\",\n      \"actions\": [\n        \"create_work_order\",\n        \"notify_supervisor\"\n      ],\n      \"citation\": \"Maintenance Policy s3.2 -- Priority Matrix\"\n    },\n    {\n      \"id\": \"OPS-003B\",\n      \"when\": \"resolved && severity == 'high' && criticality <= 2\",\n      \"priority\": \"P3\",\n      \"severity\": \"info\",\n      \"message\": \"High-severity fault on a low-criticality asset -- plan the repair.\",\n      \"actions\": [\n        \"create_work_order\"\n      ],\n      \"citation\": \"Maintenance Policy s3.2 -- Priority Matrix\"\n    },\n    {\n      \"id\": \"OPS-004\",\n      \"when\": \"resolved && severity == 'medium'\",\n      \"priority\": \"P3\",\n      \"severity\": \"info\",\n      \"message\": \"Medium-severity fault -- schedule into the next planned window.\",\n      \"actions\": [\n        \"create_work_order\"\n      ],\n      \"citation\": \"Maintenance Policy s3.3 -- Planned Maintenance Windows\"\n    },\n    {\n      \"id\": \"OPS-005\",\n      \"when\": \"resolved && severity == 'low' && !safetyRisk\",\n      \"priority\": \"P4\",\n      \"severity\": \"info\",\n      \"message\": \"Low-severity finding -- logged for condition trending.\",\n      \"actions\": [\n        \"log_only\"\n      ],\n      \"citation\": \"Maintenance Policy s3.4 -- Condition Monitoring\"\n    },\n    {\n      \"id\": \"SUP-001\",\n      \"when\": \"spareSku && !spareInStock\",\n      \"priority\": \"P2\",\n      \"severity\": \"warning\",\n      \"message\": \"Required spare {spareSku} is out of stock (lead time {spareLeadTimeDays} days) -- raise procurement.\",\n      \"actions\": [\n        \"raise_purchase_request\",\n        \"notify_planner\"\n      ],\n      \"citation\": \"Spare Parts Policy s5.1 -- Stock-Out Escalation\"\n    },\n    {\n      \"id\": \"AIQ-001\",\n      \"when\": \"confidence < 0.55\",\n      \"priority\": \"P2\",\n      \"severity\": \"warning\",\n      \"message\": \"Diagnostic confidence {confidence} is below the 0.55 floor -- human verification required.\",\n      \"actions\": [\n        \"require_human_review\"\n      ],\n      \"citation\": \"AI Assurance Policy s3.1 -- Confidence Floor\"\n    },\n    {\n      \"id\": \"AIQ-002\",\n      \"when\": \"!resolved\",\n      \"priority\": \"P2\",\n      \"severity\": \"blocker\",\n      \"message\": \"The reported asset could not be matched to the registry -- a human must identify it.\",\n      \"actions\": [\n        \"require_human_review\"\n      ],\n      \"citation\": \"AI Assurance Policy s3.4 -- No Action on Unidentified Assets\"\n    },\n    {\n      \"id\": \"AIQ-003\",\n      \"when\": \"citationCount == 0\",\n      \"priority\": \"P3\",\n      \"severity\": \"warning\",\n      \"message\": \"No supporting documentation was retrieved -- treat this diagnosis as advisory.\",\n      \"actions\": [\n        \"require_human_review\"\n      ],\n      \"citation\": \"AI Assurance Policy s3.2 -- Grounding Requirement\"\n    }\n  ],\n  \"allowedActions\": [\n    {\n      \"id\": \"create_work_order\",\n      \"label\": \"Create work order\",\n      \"reversible\": true\n    },\n    {\n      \"id\": \"raise_purchase_request\",\n      \"label\": \"Raise purchase request\",\n      \"reversible\": true\n    },\n    {\n      \"id\": \"notify_duty_engineer\",\n      \"label\": \"Notify duty engineer\",\n      \"reversible\": false\n    },\n    {\n      \"id\": \"notify_supervisor\",\n      \"label\": \"Notify supervisor\",\n      \"reversible\": false\n    },\n    {\n      \"id\": \"notify_planner\",\n      \"label\": \"Notify maintenance planner\",\n      \"reversible\": false\n    },\n    {\n      \"id\": \"notify_hse\",\n      \"label\": \"Notify HSE duty officer\",\n      \"reversible\": false\n    },\n    {\n      \"id\": \"freeze_asset\",\n      \"label\": \"Take asset out of service\",\n      \"reversible\": true\n    },\n    {\n      \"id\": \"require_permit_to_work\",\n      \"label\": \"Require permit to work\",\n      \"reversible\": true\n    },\n    {\n      \"id\": \"schedule_statutory_inspection\",\n      \"label\": \"Schedule statutory inspection\",\n      \"reversible\": true\n    },\n    {\n      \"id\": \"deploy_containment\",\n      \"label\": \"Deploy spill containment\",\n      \"reversible\": false\n    },\n    {\n      \"id\": \"require_human_review\",\n      \"label\": \"Route for human review\",\n      \"reversible\": true\n    },\n    {\n      \"id\": \"log_only\",\n      \"label\": \"Log for trending only\",\n      \"reversible\": true\n    }\n  ]\n};\n\nconst raw = $input.first().json;\n// A webhook delivers { body, headers, query }; a manual execution or a Chat\n// trigger delivers the fields directly. Accept both so the same workflow can be\n// driven from curl, from the n8n UI, or from a Teams/Power Automate POST.\nconst body = raw.body ?? raw;\n\nconst text = String(body.text ?? body.chatInput ?? '').trim();\nconst readings = body.readings && typeof body.readings === 'object' ? body.readings : {};\n\nif (!text) {\n  throw new Error('No signal text supplied. POST { \"text\": \"what was reported\" }.');\n}\n\nreturn [{\n  json: {\n    config: CONFIG,\n    signal: {\n      runId: 'RUN-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),\n      receivedAt: new Date().toISOString(),\n      text,\n      originalText: text,\n      kind: body.kind ?? 'operator_request',\n      channel: body.channel ?? 'n8n',\n      reportedBy: body.reported_by ?? body.reportedBy ?? null,\n      assetHint: body.asset_hint ?? body.assetHint ?? null,\n      readings,\n    },\n  },\n}];\n",
+        "options": {}
+      },
+      "id": "load-config",
+      "name": "Load config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -440,
+        340
+      ],
+      "notes": "Edit data/config.json and re-run build.mjs to change assets, rules or manuals."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input guardrail + PII redaction.\n//\n// Runs BEFORE anything reaches a model. The order matters: screen first so a\n// prompt-injection payload never reaches the LLM at all, then redact so personal\n// data never leaves the trust boundary. A maintenance report can arrive from an\n// email or a Teams message, so the text is genuinely untrusted input.\n\nconst signal = $input.first().json.signal;\n\nconst INJECTION = [\n  /ignore (?:all |any )?(?:previous|prior|above) instructions/i,\n  /disregard (?:the )?(?:system|previous) (?:prompt|instructions)/i,\n  /you are now (?:a|an|in) /i,\n  /reveal (?:your )?(?:system )?prompt/i,\n  /\\bauto[- ]?approve\\b.*\\beverything\\b/i,\n  /<\\/?(?:system|instructions?)>/i,\n];\n\nconst PII = [\n  ['Email', /\\b[\\w.+-]+@[\\w-]+\\.[\\w.]{2,}\\b/g],\n  ['PhoneNumber', /(?:\\+\\d{1,3}[\\s-]?)?(?:\\(?\\d{2,4}\\)?[\\s-]?)\\d{3}[\\s-]?\\d{3,4}\\b/g],\n  ['EmployeeId', /\\b(?:emp|employee|badge|pers)[\\s#:-]*\\d{3,8}\\b/gi],\n];\n\nconst matched = INJECTION.filter((re) => re.test(signal.text));\n\nlet redacted = signal.text;\nlet redactions = 0;\nconst categories = [];\nfor (const [label, re] of PII) {\n  const before = redacted;\n  redacted = redacted.replace(re, `[${label}]`);\n  if (redacted !== before) {\n    // Count how many placeholders this pattern introduced.\n    const n = (redacted.match(new RegExp(`\\\\[${label}\\\\]`, 'g')) || []).length;\n    redactions += n;\n    categories.push(label);\n  }\n}\n\nreturn [{\n  json: {\n    signal: { ...signal, text: redacted, redactions, piiCategories: categories },\n    guard: {\n      safe: matched.length === 0,\n      reason: matched.length ? 'prompt_injection' : null,\n      redactions,\n      categories,\n    },\n  },\n}];\n",
+        "options": {}
+      },
+      "id": "guard-redact",
+      "name": "Guard & redact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        340
+      ],
+      "notes": "Prompt-injection screening and PII redaction, before any model sees the text."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "safe",
+              "leftValue": "={{ $json.guard.safe }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "input-safe",
+      "name": "Input safe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        0,
+        340
+      ],
+      "notes": "Fails closed: unsafe input stops here and never reaches a model."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Asset resolution + manual retrieval.\n//\n// Resolution is layered cheapest-first: explicit id, then a configured alias,\n// then \"only one machine of that class exists\", then fuzzy token overlap. Most\n// real signals name the asset plainly and paying a model to read \"PMP-003\" back\n// to you is how a demo becomes expensive in production.\n//\n// Retrieval is a small TF-IDF-ish score over manual sections, filtered to the\n// asset's class first -- returning the crane manual for a compressor fault is\n// worse than returning nothing. Chunks are whole manual sections, because the\n// section id IS the citation an engineer needs.\n\nconst cfg = $('Load config').first().json.config;\nconst { signal, guard } = $input.first().json;\n\nconst STOP = new Set(['the','a','an','is','are','was','on','in','at','of','and','to','it','its','there','has','have','with','from','for','be','been']);\nconst tokens = (s) => String(s).toLowerCase().match(/[a-z0-9]+/g)?.filter((t) => !STOP.has(t)) ?? [];\n\nconst NUMBER_WORDS = { one:'1', two:'2', three:'3', four:'4', five:'5', six:'6', seven:'7', eight:'8', nine:'9', ten:'10', fourteen:'14' };\n\n// Operator vocabulary vs manual vocabulary. A fitter says \"leaking oil\"; the\n// manual says \"shaft seal\". Bridging that gap is most of what makes retrieval\n// work on real maintenance text.\nconst SYNONYMS = {\n  leak:['leakage','weeping','drip','seal'], leaking:['leakage','seal','weeping','drip'],\n  noise:['noisy','knocking','rattling','grinding'], grinding:['noise','brake','wear'],\n  hot:['temperature','overheating'], overheating:['temperature','hot','cooler'],\n  vibration:['vibrating','juddering','bearing','rms'], smoke:['exhaust','combustion','black'],\n  drift:['drifts','brake','holding'], drifts:['drift','brake','holding'],\n  rope:['wire','discard','broken'], pressure:['loss','hydraulic'],\n  belt:['tracking','conveyor','torn'], start:['starting','crank'],\n};\nconst expand = (ts) => ts.flatMap((t) => [t, ...(SYNONYMS[t] ?? [])]);\n\n// ---------------------------------------------------------------- resolution\n\nconst haystack = `${signal.assetHint ?? ''} ${signal.text}`;\n// Telemetry is deliberately NOT part of the matching text: \"8.2\" tokenises to\n// {8, 2} and the \"2\" then matches \"Gantry Crane 2\", so a conveyor alert\n// resolves to a crane.\nconst signalTokens = new Set(tokens(haystack));\nfor (const [word, digit] of Object.entries(NUMBER_WORDS)) {\n  if (new RegExp(`\\\\b${word}\\\\b`, 'i').test(haystack)) signalTokens.add(digit);\n}\n\nconst scoreAsset = (asset) => {\n  const upper = haystack.toUpperCase();\n  if (upper.includes(asset.id) || upper.replace(/[-\\s]/g, '').includes(asset.id.replace('-', ''))) return 1.0;\n  for (const alias of asset.aliases ?? []) {\n    if (haystack.toLowerCase().includes(alias.toLowerCase())) return 0.93;\n  }\n  const assetTokens = new Set([...tokens(`${asset.name} ${asset.class} ${asset.site}`), asset.id.split('-')[1].replace(/^0+/, '')]);\n  const overlap = [...signalTokens].filter((t) => assetTokens.has(t));\n  if (!overlap.length) return 0;\n  let score = overlap.length / assetTokens.size;\n  const unit = asset.id.split('-')[1].replace(/^0+/, '');\n  if (unit && signalTokens.has(unit)) score += 0.35;\n  return Math.min(Number(score.toFixed(3)), 0.9);\n};\n\nlet ranked = cfg.assets.map((a) => ({ asset: a, score: scoreAsset(a) }))\n  .sort((x, y) => y.score - x.score);\n\nlet asset = null;\nlet confidence = ranked[0]?.score ?? 0;\n\nif (confidence >= 0.25 && (confidence - (ranked[1]?.score ?? 0) >= 0.08 || confidence >= 0.9)) {\n  asset = ranked[0].asset;\n} else {\n  // \"The generator will not start\" is unambiguous on a site with one generator\n  // and genuinely ambiguous on a site with six. Let the registry decide which\n  // situation we are in rather than hard-coding either answer.\n  const byClass = cfg.assets.filter((a) => a.class.split('_').some((w) => signalTokens.has(w)));\n  if (byClass.length === 1) {\n    asset = byClass[0];\n    confidence = 0.78;\n  } else {\n    // Nothing matched clearly and the class is ambiguous. Below the floor it is\n    // a guess, and guessing is worse than saying we do not know: rule AIQ-002\n    // routes the unknown case to a person.\n    confidence = Math.min(confidence, cfg.policy.assetConfidenceFloor - 0.01);\n    asset = null;\n  }\n}\n\n// ---------------------------------------------------------------- retrieval\n\nconst queryTerms = expand(tokens(signal.text));\nconst pool = cfg.manuals.filter((m) => !asset || m.classes.includes(asset.class));\n\nconst scored = pool.map((m) => {\n  const docTokens = tokens(`${m.heading} ${m.text}`);\n  const counts = docTokens.reduce((acc, t) => (acc[t] = (acc[t] ?? 0) + 1, acc), {});\n  let score = 0;\n  for (const term of queryTerms) {\n    if (counts[term]) score += counts[term] / Math.sqrt(docTokens.length);\n  }\n  return { m, score };\n}).filter((x) => x.score > 0).sort((x, y) => y.score - x.score).slice(0, 4);\n\nconst best = scored[0]?.score || 1;\nconst citations = scored.map(({ m, score }) => ({\n  docId: m.docId,\n  section: m.section,\n  heading: m.heading,\n  text: m.text,\n  score: Number(Math.min(score / best, 1).toFixed(3)),\n}));\n\nreturn [{\n  json: {\n    signal,\n    guard,\n    asset,\n    assetConfidence: Number(confidence.toFixed(3)),\n    assetCandidates: ranked.slice(0, 3).filter((r) => r.score > 0.05).map((r) => ({ id: r.asset.id, name: r.asset.name, score: r.score })),\n    citations,\n    // Built here rather than inside the HTTP node's expression so the prompt is\n    // readable, diffable and testable. House style: a narrow role, the grounding\n    // material quoted verbatim with its section ids, an explicit instruction to\n    // cite, a closed output schema, and a stated escape hatch -- most\n    // hallucination is a prompt refusing to accept \"I don't know\" as an answer.\n    llmPrompt: {\n      system: [\n        'You are a maintenance engineer\\'s diagnostic assistant for industrial assets.',\n        'You reason ONLY from the manual extracts provided. Every failure mode you',\n        'propose must cite the section it came from, using the exact section id shown.',\n        'If the extracts do not support a diagnosis, return an empty failure_modes',\n        'list and a confidence below 0.4 rather than speculating.',\n        '',\n        'Severity definitions (use exactly these):',\n        '  critical - asset must stop now; safety or total loss of function',\n        '  high     - significant loss of function or a protective device impaired',\n        '  medium   - degraded but serviceable; plan into the next window',\n        '  low      - cosmetic or early-stage; monitor and trend',\n        '',\n        'Set safety_risk true only if the extracts indicate danger to people.',\n        'Set environmental_risk true only for a release of oil, fuel or chemicals.',\n      ].join('\\n'),\n      user: [\n        `ASSET: ${asset ? `${asset.name} (${asset.class}, criticality ${asset.criticality} of 5)` : 'Unidentified'}`,\n        '',\n        'MANUAL EXTRACTS:',\n        citations.map((c) => `[${c.docId} ${c.section} ${c.heading}]\\n${c.text}`).join('\\n\\n') || '(none retrieved)',\n        '',\n        `REPORTED SIGNAL (${signal.kind}):`,\n        `\"${signal.text}\"`,\n        Object.keys(signal.readings ?? {}).length ? `TELEMETRY: ${JSON.stringify(signal.readings)}` : '',\n        '',\n        'Reply with JSON only:',\n        '{\"summary\":\"<two sentences for a supervisor>\",',\n        ' \"failure_modes\":[{\"name\":\"<short name>\",\"likelihood\":<0.0-1.0>,\"rationale\":\"<why>\",\"sections\":[\"<section id e.g. s3.1>\"]}],',\n        ' \"severity\":\"critical|high|medium|low\",\"safety_risk\":true|false,\"environmental_risk\":true|false,',\n        ' \"injury_reported\":true|false,\"near_miss\":true|false,\"confidence\":<0.0-1.0>,\"recommended_spare\":\"<sku or null>\"}',\n      ].join('\\n'),\n    },\n  },\n}];\n",
+        "options": {}
+      },
+      "id": "resolve-asset-retrieve-manuals",
+      "name": "Resolve asset & retrieve manuals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        240
+      ],
+      "notes": "Registry match, then manual sections filtered by asset class. Chunked by section because the section id is the citation."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-key",
+              "leftValue": "={{ $env.AZURE_OPENAI_API_KEY }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "azure-configured",
+      "name": "Azure OpenAI configured?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        240
+      ],
+      "notes": "With no key set the workflow still runs end to end on the built-in rules."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AZURE_OPENAI_ENDPOINT }}/openai/deployments/{{ $env.AZURE_OPENAI_DEPLOYMENT || \"gpt-4o-mini\" }}/chat/completions?api-version={{ $env.AZURE_OPENAI_API_VERSION || \"2024-06-01\" }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-key",
+              "value": "={{ $env.AZURE_OPENAI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messages: [ { role: \"system\", content: $json.llmPrompt.system }, { role: \"user\", content: $json.llmPrompt.user } ], temperature: 0.1, max_tokens: 900, response_format: { type: \"json_object\" } }) }}",
+        "options": {
+          "timeout": 45000
+        }
+      },
+      "id": "azure-openai",
+      "name": "Azure OpenAI diagnosis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        140
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "On error the run continues; the parser downgrades confidence so a human is pulled in."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the Azure OpenAI reply into the same shape the built-in branch emits.\n//\n// Two jobs, both about not trusting the model's output shape:\n//  1. Extract and validate JSON. A model occasionally wraps it in prose or a\n//     fenced block, and a free-text answer cannot drive a work order.\n//  2. Map the section ids it cited back to sections we actually retrieved.\n//     A model can only legitimately cite what it was given; anything else is\n//     dropped rather than displayed. That is the difference between a citation\n//     and a plausible-looking string.\n//\n// If the reply cannot be salvaged we fall back to the retrieved evidence rather\n// than failing the run -- but we say so in `source`, so nobody mistakes a\n// degraded run for a good one.\n\nconst upstream = $('Resolve asset & retrieve manuals').first().json;\nconst { signal, guard, asset, assetConfidence, assetCandidates, citations } = upstream;\n\nconst raw = $input.first().json;\nlet content = raw?.choices?.[0]?.message?.content ?? '';\n\nlet data = null;\ntry {\n  const cleaned = String(content).trim().replace(/^```(?:json)?\\s*|\\s*```$/g, '');\n  data = JSON.parse(cleaned);\n} catch (e) {\n  const match = String(content).match(/\\{[\\s\\S]*\\}/);\n  if (match) { try { data = JSON.parse(match[0]); } catch (_) { data = null; } }\n}\n\nconst RANK = { low: 0, medium: 1, high: 2, critical: 3 };\nconst valid = data && typeof data.summary === 'string' && data.summary.trim() && RANK[String(data.severity).toLowerCase()] !== undefined;\n\nif (!valid) {\n  return [{\n    json: {\n      signal, guard, asset, assetConfidence, assetCandidates, citations,\n      diagnosis: {\n        summary: citations.length\n          ? `Model reply could not be parsed. Closest manual section: ${citations[0].heading}.`\n          : 'Model reply could not be parsed and no manual section matched.',\n        severity: 'medium',\n        safetyRisk: false, environmentalRisk: false, injury: false, nearMiss: false,\n        // Deliberately below the confidence floor so rule AIQ-001 forces a human.\n        confidence: 0.3,\n        recommendedSpare: null,\n        failureModes: [],\n        source: 'azure openai (unparseable reply, degraded)',\n        evidence: {},\n      },\n    },\n  }];\n}\n\nconst bySection = Object.fromEntries(citations.map((c) => [c.section.toLowerCase(), c]));\nconst failureModes = (Array.isArray(data.failure_modes) ? data.failure_modes : []).map((m) => {\n  const cited = (Array.isArray(m.sections) ? m.sections : [])\n    .map((s) => bySection[String(s).trim().toLowerCase().split(' ')[0]])\n    .filter(Boolean);\n  return {\n    name: String(m.name ?? 'unnamed'),\n    likelihood: Number(m.likelihood ?? 0),\n    rationale: String(m.rationale ?? ''),\n    citation: cited.length ? `${cited[0].docId} ${cited[0].section}` : null,\n  };\n}).filter((m) => m.citation);  // an uncited failure mode is not shown\n\nreturn [{\n  json: {\n    signal, guard, asset, assetConfidence, assetCandidates, citations,\n    diagnosis: {\n      summary: String(data.summary).trim(),\n      severity: String(data.severity).toLowerCase(),\n      safetyRisk: Boolean(data.safety_risk),\n      environmentalRisk: Boolean(data.environmental_risk),\n      injury: Boolean(data.injury_reported),\n      nearMiss: Boolean(data.near_miss),\n      confidence: Number(Number(data.confidence ?? 0).toFixed(2)),\n      recommendedSpare: data.recommended_spare || null,\n      failureModes,\n      source: 'azure openai',\n      evidence: {},\n    },\n  },\n}];\n",
+        "options": {}
+      },
+      "id": "parse-diagnosis",
+      "name": "Parse diagnosis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        140
+      ],
+      "notes": "Validates the JSON and drops any citation the model did not actually receive."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Built-in diagnosis -- the no-cloud path.\n//\n// This is not a stub. It is a real rule-based diagnosis over the same retrieved\n// manual sections the LLM branch would use, so the workflow produces sensible,\n// citable output with no Azure account attached. That is what makes this\n// importable-and-working rather than importable-and-needs-six-keys.\n\nconst cfg = $('Load config').first().json.config;\nconst { signal, guard, asset, assetConfidence, assetCandidates, citations } = $input.first().json;\n\nconst text = signal.text.toLowerCase();\nconst has = (s, markers) => markers.filter((m) => new RegExp(`\\\\b${m.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\\\b`, 'i').test(s));\n\n// Phrases that, in a MANUAL, mean the equipment is dangerous right now.\nconst MANUAL_SAFETY = ['safety critical','unsafe to operate','must not be operated','taken out of service immediately','must be taken out of service','lock out','snap-back','lethal','statutory','drop under gravity','no lifting operation may continue','severe safety hazard','must not run'];\nconst MANUAL_ENV = ['oil release','release to water','spill','contaminates','fire risk'];\n\n// What an operator writes, graded. First hit wins, most severe first.\nconst SIGNAL_SEVERITY = [\n  ['critical', ['will not start','wont start',\"won't start\",'failed to start','seized','snapped','parted','fire','cracked','crack','total failure','load drifts','drifts down','drifting down','does not stop',\"doesn't stop\",'not stopping','unresponsive','collapsed','no longer works']],\n  ['high',     ['leaking','leak','leaks','overheating','overheat','alarm','tripped','grinding','pressure loss','loss of pressure','torn','burning smell','sparking','out of tolerance','quality escape','smoke','black smoke']],\n  ['medium',   ['noise','noisy','knocking','rattling','vibration','vibrating','juddering','weeping','seeping','intermittent','sluggish','warm','hot','deviation','occasionally']],\n  ['low',      ['cosmetic','scratch','paint','label','minor','slight','monitoring','trending','routine','for information']],\n];\nconst INJURY = ['injured','injury','hurt','burned','burnt','crushed','struck by','hit by','taken to hospital','first aid','laceration','fracture'];\nconst NEAR_MISS = ['near miss','near-miss','nearly hit','almost hit','close call'];\nconst ENV_SIGNAL = ['spill','spilled','into the water','overboard','on the ground','on the floor','reached the deck','contaminated'];\n\nconst RANK = { low: 0, medium: 1, high: 2, critical: 3 };\nconst worst = (a, b) => (RANK[a] >= RANK[b] ? a : b);\n\n// Telemetry thresholds. In production these come from the asset's condition\n// monitoring policy; here they are the manual's published limits.\nconst THRESHOLDS = [['vibration', 7.1, 11.0], ['temperature', 90, 98], ['temp', 90, 98]];\n\nlet severity = 'medium';\nlet evidence = [];\nfor (const [level, markers] of SIGNAL_SEVERITY) {\n  const hits = has(text, markers);\n  if (hits.length) { severity = level; evidence = hits; break; }\n}\n\nconst readingHits = [];\nfor (const [key, value] of Object.entries(signal.readings ?? {})) {\n  for (const [marker, high, critical] of THRESHOLDS) {\n    if (!key.toLowerCase().includes(marker)) continue;\n    if (value >= critical) { severity = worst(severity, 'critical'); readingHits.push(`${key}=${value} at or above the critical limit ${critical}`); }\n    else if (value >= high) { severity = worst(severity, 'high'); readingHits.push(`${key}=${value} at or above the alert limit ${high}`); }\n  }\n}\n\n// Hazard flags come from the section that describes THIS fault -- the top hit --\n// plus anything effectively tied with it. Within a class-filtered corpus every\n// section shares the class word, so a section about an unrelated fault on the\n// same machine (\"Conveyor Emergency Stop Integrity\") scores high on overlap\n// alone and would otherwise flag a routine bearing trend as safety-critical.\nconst evidenceCitations = citations.filter((c) => c.score >= 0.97);\nconst corpus = evidenceCitations.map((c) => `${c.heading} ${c.text}`).join(' ').toLowerCase();\n\nconst safetyRisk = has(corpus, MANUAL_SAFETY).length > 0;\nif (safetyRisk) severity = worst(severity, 'high');\n\nconst injury = has(text, INJURY).length > 0;\nconst nearMiss = has(text, NEAR_MISS).length > 0;\nif (injury) severity = 'critical';\n\nconst environmentalRisk =\n  (has(corpus, MANUAL_ENV).length > 0 && has(text, ['leak','leaking','leakage','spill','oil','fuel','coolant','hydraulic','release']).length > 0)\n  || has(text, ENV_SIGNAL).length > 0;\n\n// Only sections that plausibly describe this fault become failure modes. A\n// weakly matched section is a useful source but listing it as a \"22% likely\n// failure mode\" is noise that trains people to skim.\nconst failureModes = citations.filter((c) => c.score >= 0.3).slice(0, 3).map((c) => ({\n  name: c.heading,\n  likelihood: c.score,\n  rationale: c.text.split('. ')[0] + '.',\n  citation: `${c.docId} ${c.section}`,\n}));\n\nlet confidence = 0.35 + 0.35 * (citations[0]?.score ?? 0)\n  + (evidence.length || readingHits.length ? 0.12 : 0)\n  + (citations.length >= 2 ? 0.10 : 0);\nif (!citations.length) confidence = 0.25;\nconfidence = Number(Math.min(confidence, 0.93).toFixed(2));\n\n// Prefer a SKU the manual itself names; fall back to the class catalogue.\nlet spare = null;\nfor (const c of evidenceCitations.length ? evidenceCitations : citations.slice(0, 1)) {\n  const m = c.text.match(/\\b[A-Z]{3,4}-[A-Z0-9-]{2,}\\b/);\n  if (m && cfg.spares.some((s) => s.sku === m[0])) { spare = m[0]; break; }\n}\nif (!spare && asset) {\n  const forClass = cfg.spares.filter((s) => s.classes.includes(asset.class));\n  if (forClass.length === 1) spare = forClass[0].sku;\n}\n\nconst lead = failureModes[0]?.name?.toLowerCase() ?? 'an unclassified fault';\nconst summary = `Most likely ${lead}, assessed as ${severity} severity`\n  + (safetyRisk ? ' with a safety risk to personnel' : '')\n  + (environmentalRisk ? ' and a potential environmental release' : '')\n  + `. Grounded in ${citations.length} manual section(s); `\n  + (readingHits.length ? 'telemetry exceeds published limits' : 'based on the reported symptoms') + '.';\n\nreturn [{\n  json: {\n    signal, guard, asset, assetConfidence, assetCandidates, citations,\n    diagnosis: {\n      summary, severity, safetyRisk, environmentalRisk, injury, nearMiss,\n      confidence, recommendedSpare: spare, failureModes,\n      source: 'built-in rules',\n      evidence: { signalMarkers: evidence, readingMarkers: readingHits },\n    },\n  },\n}];\n",
+        "options": {}
+      },
+      "id": "diagnose-built-in-",
+      "name": "Diagnose (built-in)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        340
+      ],
+      "notes": "Rule-based diagnosis over the same retrieved sections. Real logic, not a stub."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Risk scoring, policy engine and action planning.\n//\n// This is the part that decides, and it is deliberately deterministic. The model\n// (when configured) diagnoses and explains; what priority the work gets, whether\n// a human must sign it off, and which actions are permitted are all decided\n// here from the rules in data/config.json. You can unit-test this. You cannot\n// unit-test a prompt's judgement.\n\nconst cfg = $('Load config').first().json.config;\nconst input = $input.first().json;\nconst { signal, guard, asset, assetConfidence, assetCandidates, citations, diagnosis } = input;\n\n// ------------------------------------------------------------ risk scoring\n\n// Published, boring, and the same answer every time -- which is exactly what a\n// maintenance planner wants from an automated system.\nconst MATRIX = {\n  critical: { 5: 'P1', 4: 'P1', 3: 'P2', 2: 'P2', 1: 'P2' },\n  high:     { 5: 'P1', 4: 'P2', 3: 'P2', 2: 'P3', 1: 'P3' },\n  medium:   { 5: 'P2', 4: 'P3', 3: 'P3', 2: 'P3', 1: 'P4' },\n  low:      { 5: 'P3', 4: 'P4', 3: 'P4', 2: 'P4', 1: 'P4' },\n};\nconst ORDER = { P1: 1, P2: 2, P3: 3, P4: 4 };\n\nconst criticality = asset?.criticality ?? 3;\nlet priority = MATRIX[diagnosis.severity]?.[criticality] ?? 'P3';\nconst reasons = [`severity=${diagnosis.severity} x criticality=${criticality} -> ${priority}`];\n\nif (diagnosis.safetyRisk && ORDER[priority] > 1) { priority = 'P1'; reasons.push('safety risk to personnel escalates to P1'); }\nif (diagnosis.injury) { priority = 'P1'; reasons.push('injury reported escalates to P1'); }\nif (diagnosis.environmentalRisk && ORDER[priority] > 2) { priority = 'P2'; reasons.push('environmental release risk escalates to at least P2'); }\n\n// ------------------------------------------------------------ policy engine\n\nconst spare = diagnosis.recommendedSpare ? cfg.spares.find((s) => s.sku === diagnosis.recommendedSpare) : null;\n\nconst ctx = {\n  resolved: Boolean(asset),\n  criticality,\n  severity: diagnosis.severity,\n  safetyRisk: diagnosis.safetyRisk,\n  environmentalRisk: diagnosis.environmentalRisk,\n  injury: diagnosis.injury,\n  nearMiss: diagnosis.nearMiss,\n  confidence: diagnosis.confidence,\n  citationCount: citations.length,\n  isLifting: asset ? ['crane', 'winch'].includes(asset.class) : false,\n  spareSku: spare?.sku ?? null,\n  spareInStock: spare ? spare.stock > 0 : false,\n  spareLeadTimeDays: spare?.leadTimeDays ?? 0,\n};\n\n// Rule expressions live in config, so they get a character allow-list before\n// evaluation: identifiers, numbers, quoted strings and comparison/boolean\n// operators only. No property access, brackets, calls or arrows -- which rules\n// out property-chain escapes (`x.constructor.constructor`) by construction\n// rather than by blacklist.\n//\n// Number literals are blanked before the check, because a decimal point is a\n// dot and `confidence < 0.55` is a perfectly ordinary rule.\nconst SAFE_EXPR = /^[A-Za-z0-9_\\s'\"=!<>&|()+\\-*/.]*$/;\nconst BANNED = /(\\.|=>|\\[|\\]|`|;|\\bthis\\b|\\bfunction\\b|\\bnew\\b|\\bimport\\b|\\brequire\\b|\\bglobalThis\\b|\\bprocess\\b|\\bconstructor\\b)/;\nconst withoutNumbers = (expr) => expr.replace(/\\d+(?:\\.\\d+)?/g, '0');\n\nconst keys = Object.keys(ctx);\nconst values = keys.map((k) => ctx[k]);\nconst findings = [];\nconst badRules = [];\n\nfor (const rule of cfg.rules) {\n  const expr = String(rule.when);\n  if (!SAFE_EXPR.test(expr) || BANNED.test(withoutNumbers(expr))) { badRules.push(rule.id); continue; }\n  let fired = false;\n  try {\n    fired = Boolean(new Function(...keys, `\"use strict\"; return (${expr});`)(...values));\n  } catch (e) {\n    badRules.push(rule.id);\n    continue;\n  }\n  if (!fired) continue;\n  findings.push({\n    ruleId: rule.id,\n    severity: rule.severity,\n    priority: rule.priority,\n    message: String(rule.message).replace(/\\{(\\w+)\\}/g, (_, k) => (ctx[k] ?? 'n/a')),\n    actions: rule.actions ?? [],\n    citation: rule.citation,\n  });\n}\n\n// A rule we could not evaluate might have been the one that would have stopped\n// us. Fail closed rather than pretend a clean pass.\nif (badRules.length) {\n  throw new Error(`Policy rules could not be evaluated: ${badRules.join(', ')}. Refusing to continue.`);\n}\n\nfindings.sort((a, b) => ORDER[a.priority] - ORDER[b.priority]);\nif (findings.length && ORDER[findings[0].priority] < ORDER[priority]) {\n  priority = findings[0].priority;\n  reasons.push(`policy rule ${findings[0].ruleId} raises it to ${priority}`);\n}\n\n// ------------------------------------------------------------ action plan\n\nconst allowed = Object.fromEntries(cfg.allowedActions.map((a) => [a.id, a]));\nconst actions = [];\nfor (const finding of findings) {\n  for (const id of finding.actions) {\n    // The allow-list is a ceiling, not a suggestion.\n    if (!allowed[id] || actions.some((a) => a.id === id)) continue;\n    actions.push({\n      id,\n      label: allowed[id].label,\n      reversible: allowed[id].reversible,\n      rationale: `${finding.message} (${finding.citation})`,\n      sourceRules: findings.filter((f) => f.actions.includes(id)).map((f) => f.ruleId),\n    });\n  }\n}\nif (!actions.length) {\n  // A silent no-op is the worst outcome: nobody knows nothing happened.\n  actions.push({\n    id: 'require_human_review',\n    label: allowed.require_human_review.label,\n    reversible: true,\n    rationale: 'No policy rule covered this case; routing to a human so the gap is visible.',\n    sourceRules: [],\n  });\n}\n\n// ------------------------------------------------------- the approval gate\n\nconst approvalReasons = [];\nif (ORDER[priority] <= ORDER[cfg.policy.humanApprovalAtOrAbove]) approvalReasons.push(`priority ${priority} is at or above the ${cfg.policy.humanApprovalAtOrAbove} approval threshold`);\nif (diagnosis.confidence < cfg.policy.confidenceFloor) approvalReasons.push(`confidence ${diagnosis.confidence} is below the ${cfg.policy.confidenceFloor} floor`);\nif (!asset) approvalReasons.push('the asset could not be identified');\nif (findings.some((f) => f.severity === 'blocker')) approvalReasons.push('a blocker-severity policy rule fired');\nconst irreversible = actions.filter((a) => !a.reversible).map((a) => a.id);\nif (irreversible.length) approvalReasons.push(`the plan contains irreversible action(s): ${irreversible.join(', ')}`);\n\nconst slaHours = cfg.policy.slaHours[priority] ?? 168;\n\nreturn [{\n  json: {\n    runId: signal.runId,\n    receivedAt: signal.receivedAt,\n    status: approvalReasons.length ? 'awaiting_approval' : 'auto_dispatch',\n    requiresApproval: approvalReasons.length > 0,\n    approvalReason: approvalReasons.join('; '),\n    priority,\n    priorityReasons: reasons,\n    slaDueAt: new Date(Date.now() + slaHours * 3600 * 1000).toISOString(),\n    asset: asset ? { id: asset.id, name: asset.name, site: asset.site, criticality: asset.criticality, class: asset.class } : null,\n    assetConfidence,\n    assetCandidates,\n    diagnosis,\n    findings,\n    actions,\n    citations: citations.map((c) => ({ docId: c.docId, section: c.section, heading: c.heading, score: c.score })),\n    redactions: signal.redactions,\n    reportedText: signal.text,\n  },\n}];\n",
+        "options": {}
+      },
+      "id": "score-risk-apply-policy-plan",
+      "name": "Score risk, apply policy & plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        240
+      ],
+      "notes": "Deterministic: priority matrix, policy rules with citations, allow-listed action plan."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "needs-human",
+              "leftValue": "={{ $json.requiresApproval }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "needs-approval",
+      "name": "Needs human approval?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        240
+      ],
+      "notes": "The policy engine decides this, not the workflow author and not the model."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TEAMS_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: \"message\", attachments: [{ contentType: \"application/vnd.microsoft.card.adaptive\", content: { $schema: \"http://adaptivecards.io/schemas/adaptive-card.json\", type: \"AdaptiveCard\", version: \"1.4\", body: [ { type: \"TextBlock\", size: \"Large\", weight: \"Bolder\", text: $json.priority + \" - \" + ($json.asset ? $json.asset.name : \"Unidentified asset\") }, { type: \"TextBlock\", wrap: true, text: $json.diagnosis.summary }, { type: \"TextBlock\", wrap: true, isSubtle: true, text: \"Held because: \" + $json.approvalReason }, { type: \"FactSet\", facts: $json.findings.map(f => ({ title: f.ruleId, value: f.citation })) }, { type: \"TextBlock\", wrap: true, weight: \"Bolder\", text: \"Proposed: \" + $json.actions.map(a => a.label).join(\", \") } ] } }] }) }}",
+        "options": {}
+      },
+      "id": "teams-card",
+      "name": "Ask a supervisor in Teams",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        140
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Optional. Unset TEAMS_WEBHOOK_URL and the run still completes."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "o1",
+              "name": "outcome",
+              "value": "auto-dispatched within policy",
+              "type": "string"
+            },
+            {
+              "id": "o2",
+              "name": "dispatched",
+              "value": "={{ $json.actions.map(a => a.id).join(\", \") }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "auto-dispatch",
+      "name": "Auto-dispatch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1560,
+        340
+      ],
+      "notes": "Low-priority, high-confidence, reversible work only. Wire real connectors here."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "status",
+              "value": "rejected_at_guardrail",
+              "type": "string"
+            },
+            {
+              "id": "b2",
+              "name": "reason",
+              "value": "={{ $json.guard.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "b3",
+              "name": "message",
+              "value": "Input rejected before it reached a model. Nothing was diagnosed or dispatched.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "blocked",
+      "name": "Blocked",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1800,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Signal received": {
+      "main": [
+        [
+          {
+            "node": "Load config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load config": {
+      "main": [
+        [
+          {
+            "node": "Guard & redact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard & redact": {
+      "main": [
+        [
+          {
+            "node": "Input safe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input safe?": {
+      "main": [
+        [
+          {
+            "node": "Resolve asset & retrieve manuals",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Blocked": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve asset & retrieve manuals": {
+      "main": [
+        [
+          {
+            "node": "Azure OpenAI configured?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure OpenAI configured?": {
+      "main": [
+        [
+          {
+            "node": "Azure OpenAI diagnosis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Diagnose (built-in)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure OpenAI diagnosis": {
+      "main": [
+        [
+          {
+            "node": "Parse diagnosis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse diagnosis": {
+      "main": [
+        [
+          {
+            "node": "Score risk, apply policy & plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Diagnose (built-in)": {
+      "main": [
+        [
+          {
+            "node": "Score risk, apply policy & plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score risk, apply policy & plan": {
+      "main": [
+        [
+          {
+            "node": "Needs human approval?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs human approval?": {
+      "main": [
+        [
+          {
+            "node": "Ask a supervisor in Teams",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Auto-dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask a supervisor in Teams": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-dispatch": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "agentflow-standalone"
+  },
+  "tags": [
+    {
+      "name": "agentflow"
+    }
+  ]
+}

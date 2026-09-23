@@ -1,0 +1,518 @@
+{
+  "_comment": "The whole business configuration for the standalone n8n workflow. This is the only file you edit to make it yours: your equipment, your policy rules, your manual extracts. `npm run build` folds it into the Load config node so the exported workflow stays a single importable file.",
+  "policy": {
+    "slaHours": {
+      "P1": 2,
+      "P2": 8,
+      "P3": 48,
+      "P4": 168
+    },
+    "humanApprovalAtOrAbove": "P2",
+    "confidenceFloor": 0.55,
+    "assetConfidenceFloor": 0.45
+  },
+  "assets": [
+    {
+      "id": "PMP-003",
+      "name": "Hydraulic Power Unit 3",
+      "class": "hydraulic_pump",
+      "site": "Dry Dock 2",
+      "criticality": 5,
+      "aliases": [
+        "hydraulic pump 3",
+        "hpu 3",
+        "pump three",
+        "aft deck pump"
+      ]
+    },
+    {
+      "id": "CRN-002",
+      "name": "Gantry Crane 2",
+      "class": "crane",
+      "site": "Assembly Hall North",
+      "criticality": 5,
+      "aliases": [
+        "crane 2",
+        "gantry 2",
+        "overhead crane"
+      ]
+    },
+    {
+      "id": "GEN-014",
+      "name": "Emergency Generator 14",
+      "class": "diesel_generator",
+      "site": "Assembly Hall North",
+      "criticality": 4,
+      "aliases": [
+        "generator 14",
+        "emergency genset",
+        "backup generator"
+      ]
+    },
+    {
+      "id": "CMP-007",
+      "name": "Air Compressor 7",
+      "class": "air_compressor",
+      "site": "Assembly Hall North",
+      "criticality": 3,
+      "aliases": [
+        "compressor 7",
+        "air comp 7"
+      ]
+    },
+    {
+      "id": "WLD-021",
+      "name": "Robotic Welding Cell 21",
+      "class": "welding_robot",
+      "site": "Assembly Hall North",
+      "criticality": 4,
+      "aliases": [
+        "welding cell 21",
+        "weld robot 21",
+        "panel line robot"
+      ]
+    },
+    {
+      "id": "CNV-009",
+      "name": "Plate Transfer Conveyor 9",
+      "class": "conveyor",
+      "site": "Assembly Hall North",
+      "criticality": 2,
+      "aliases": [
+        "conveyor 9",
+        "plate conveyor",
+        "outfeed belt"
+      ]
+    },
+    {
+      "id": "HVC-001",
+      "name": "Paint Hall Air Handling Unit 1",
+      "class": "hvac_ahu",
+      "site": "Outfitting Quay",
+      "criticality": 3,
+      "aliases": [
+        "ahu 1",
+        "air handling unit 1",
+        "paint hall hvac"
+      ]
+    },
+    {
+      "id": "WNC-004",
+      "name": "Mooring Winch 4",
+      "class": "winch",
+      "site": "Outfitting Quay",
+      "criticality": 4,
+      "aliases": [
+        "winch 4",
+        "mooring winch"
+      ]
+    }
+  ],
+  "spares": [
+    {
+      "sku": "SEAL-A10-KIT",
+      "classes": [
+        "hydraulic_pump"
+      ],
+      "stock": 4,
+      "leadTimeDays": 3
+    },
+    {
+      "sku": "BRK-PAD-40T",
+      "classes": [
+        "crane"
+      ],
+      "stock": 2,
+      "leadTimeDays": 7
+    },
+    {
+      "sku": "WIRE-ROPE-24",
+      "classes": [
+        "crane",
+        "winch"
+      ],
+      "stock": 1,
+      "leadTimeDays": 21
+    },
+    {
+      "sku": "INJ-C18",
+      "classes": [
+        "diesel_generator"
+      ],
+      "stock": 0,
+      "leadTimeDays": 28
+    },
+    {
+      "sku": "CMP-ELEM-90",
+      "classes": [
+        "air_compressor"
+      ],
+      "stock": 1,
+      "leadTimeDays": 35
+    },
+    {
+      "sku": "BELT-PC1200",
+      "classes": [
+        "conveyor"
+      ],
+      "stock": 2,
+      "leadTimeDays": 9
+    },
+    {
+      "sku": "FLT-BAG-DV150",
+      "classes": [
+        "hvac_ahu"
+      ],
+      "stock": 6,
+      "leadTimeDays": 4
+    }
+  ],
+  "manuals": [
+    {
+      "docId": "MAN-HYD-A10VSO",
+      "section": "s3.1",
+      "heading": "Shaft Seal Leakage",
+      "classes": [
+        "hydraulic_pump"
+      ],
+      "text": "Oil weeping at the drive shaft indicates shaft seal wear. A steady drip rather than a film means the seal has failed and the unit must be taken out of service. Replace with seal kit SEAL-A10-KIT. Running the pump with a failed shaft seal risks an oil release to the deck or to water."
+    },
+    {
+      "docId": "MAN-HYD-A10VSO",
+      "section": "s3.4",
+      "heading": "Pressure Loss Under Load",
+      "classes": [
+        "hydraulic_pump"
+      ],
+      "text": "Gradual loss of system pressure under load with rising case-drain flow points to worn pistons or a damaged swash plate. Continued operation accelerates wear and can seize the rotary group. Overhaul is required; this is not a field repair."
+    },
+    {
+      "docId": "MAN-CRN-SMARTON",
+      "section": "s4.2",
+      "heading": "Hoist Brake Performance",
+      "classes": [
+        "crane"
+      ],
+      "text": "Any increase in load drift after the brake sets, or a grinding noise during braking, means brake pad wear or a contaminated disc. A crane that drifts under load is unsafe to operate and must be taken out of service immediately. Replace pads as a set (BRK-PAD-40T). A statutory thorough examination is required before return to service."
+    },
+    {
+      "docId": "MAN-CRN-SMARTON",
+      "section": "s4.5",
+      "heading": "Wire Rope Discard Criteria",
+      "classes": [
+        "crane",
+        "winch"
+      ],
+      "text": "Discard the rope when broken wires exceed 10 in any 6d length, on localised diameter reduction over 7 percent, on visible corrosion pitting, or on any core protrusion or kinking. Rope defects are safety critical: no lifting operation may continue. Replacement rope is WIRE-ROPE-24."
+    },
+    {
+      "docId": "MAN-GEN-C18",
+      "section": "s2.3",
+      "heading": "Failure to Start on Demand",
+      "classes": [
+        "diesel_generator"
+      ],
+      "text": "An emergency set that fails a start test has lost its protective function. Check starting batteries under load, fuel supply and air inlet restriction first. An emergency generator that will not start is treated as a critical defect whether or not the site is currently on mains power."
+    },
+    {
+      "docId": "MAN-GEN-C18",
+      "section": "s2.6",
+      "heading": "Black Smoke and Power Loss",
+      "classes": [
+        "diesel_generator"
+      ],
+      "text": "Black exhaust smoke with reduced output indicates incomplete combustion, most commonly a restricted air filter or failing injectors (INJ-C18). Check inlet restriction before condemning injectors. Injector replacement is a long-lead item."
+    },
+    {
+      "docId": "MAN-CMP-GA90",
+      "section": "s3.2",
+      "heading": "High Element Outlet Temperature",
+      "classes": [
+        "air_compressor"
+      ],
+      "text": "Element outlet temperature above 110C trips the unit. Common causes are low oil level, a blocked oil cooler, a failed thermostatic valve, or high ambient temperature. Repeated high-temperature trips shorten element life. The compressor element CMP-ELEM-90 is a long-lead item."
+    },
+    {
+      "docId": "MAN-WLD-IRB1520",
+      "section": "s2.4",
+      "heading": "Weld Seam Deviation",
+      "classes": [
+        "welding_robot"
+      ],
+      "text": "Progressive deviation of the weld seam indicates torch neck deformation, a shifted tool centre point, or worn axis gearboxes. Recalibrate the tool centre point before replacing mechanical parts. Deviating welds on structural joints are a quality escape and must be quarantined."
+    },
+    {
+      "docId": "MAN-WLD-IRB1520",
+      "section": "s3.1",
+      "heading": "Axis Brake Fault",
+      "classes": [
+        "welding_robot"
+      ],
+      "text": "A brake fault on any axis means the arm can drop under gravity when powered down. The cell must be isolated and no one may enter the working envelope until the brake is proven. This is a safety critical fault."
+    },
+    {
+      "docId": "MAN-GEN-PLANT",
+      "section": "s2.1",
+      "heading": "Conveyor Belt Tracking and Damage",
+      "classes": [
+        "conveyor"
+      ],
+      "text": "A belt running off-centre wears the edge and can tear. Check idler alignment and material loading before adjusting tracking. A torn belt BELT-PC1200 stops material flow but is not usually a safety issue unless personnel access the pinch points."
+    },
+    {
+      "docId": "MAN-GEN-PLANT",
+      "section": "s2.4",
+      "heading": "Conveyor Emergency Stop Integrity",
+      "classes": [
+        "conveyor"
+      ],
+      "text": "A pull-cord or emergency stop that does not stop the belt is a safety critical defect. The conveyor must not run until it is restored."
+    },
+    {
+      "docId": "MAN-GEN-PLANT",
+      "section": "s3.6",
+      "heading": "Fan Bearing Vibration",
+      "classes": [
+        "hvac_ahu",
+        "conveyor"
+      ],
+      "text": "Rising fan bearing vibration precedes failure by weeks. Trend it. Above 7.1 mm/s RMS plan a bearing change at the next window; above 11 mm/s RMS stop the machine."
+    },
+    {
+      "docId": "MAN-GEN-PLANT",
+      "section": "s4.3",
+      "heading": "Mooring Winch Brake Holding Capacity",
+      "classes": [
+        "winch"
+      ],
+      "text": "A mooring winch brake that renders below its design holding load is a severe safety hazard: a parted line under tension has a lethal snap-back zone. Take the winch out of service and re-test the brake holding capacity."
+    }
+  ],
+  "rules": [
+    {
+      "id": "SAF-001",
+      "when": "injury",
+      "priority": "P1",
+      "severity": "blocker",
+      "message": "Personal safety event reported -- HSE duty officer must be engaged before any maintenance action.",
+      "actions": [
+        "notify_hse",
+        "freeze_asset"
+      ],
+      "citation": "HSE Procedure s2.1 -- Reporting of Injuries and Near Misses"
+    },
+    {
+      "id": "SAF-002",
+      "when": "safetyRisk && criticality >= 4",
+      "priority": "P1",
+      "severity": "blocker",
+      "message": "Safety-critical fault on a criticality-{criticality} asset -- lock out and tag out before work.",
+      "actions": [
+        "freeze_asset",
+        "notify_duty_engineer",
+        "require_permit_to_work"
+      ],
+      "citation": "HSE Procedure s9.1 -- Lock-Out/Tag-Out"
+    },
+    {
+      "id": "SAF-003",
+      "when": "isLifting && (severity == 'critical' || severity == 'high')",
+      "priority": "P1",
+      "severity": "blocker",
+      "message": "Defect on lifting equipment -- statutory re-examination required before return to service.",
+      "actions": [
+        "freeze_asset",
+        "schedule_statutory_inspection"
+      ],
+      "citation": "Lifting Equipment Standard s4.4 -- Thorough Examination After Defect"
+    },
+    {
+      "id": "ENV-001",
+      "when": "environmentalRisk",
+      "priority": "P1",
+      "severity": "blocker",
+      "message": "Environmental release risk identified -- containment procedure applies.",
+      "actions": [
+        "notify_hse",
+        "deploy_containment"
+      ],
+      "citation": "Environmental Procedure s6.2 -- Spill Containment"
+    },
+    {
+      "id": "OPS-001",
+      "when": "resolved && severity == 'critical' && criticality >= 4",
+      "priority": "P1",
+      "severity": "blocker",
+      "message": "Critical fault on a production-stopping asset -- immediate response.",
+      "actions": [
+        "notify_duty_engineer",
+        "create_work_order"
+      ],
+      "citation": "Maintenance Policy s3.2 -- Priority Matrix"
+    },
+    {
+      "id": "OPS-002",
+      "when": "resolved && severity == 'critical' && criticality <= 3",
+      "priority": "P2",
+      "severity": "warning",
+      "message": "Critical fault on a criticality-{criticality} asset.",
+      "actions": [
+        "create_work_order",
+        "notify_supervisor"
+      ],
+      "citation": "Maintenance Policy s3.2 -- Priority Matrix"
+    },
+    {
+      "id": "OPS-003",
+      "when": "resolved && severity == 'high' && criticality >= 3",
+      "priority": "P2",
+      "severity": "warning",
+      "message": "High-severity fault on a criticality-{criticality} asset.",
+      "actions": [
+        "create_work_order",
+        "notify_supervisor"
+      ],
+      "citation": "Maintenance Policy s3.2 -- Priority Matrix"
+    },
+    {
+      "id": "OPS-003B",
+      "when": "resolved && severity == 'high' && criticality <= 2",
+      "priority": "P3",
+      "severity": "info",
+      "message": "High-severity fault on a low-criticality asset -- plan the repair.",
+      "actions": [
+        "create_work_order"
+      ],
+      "citation": "Maintenance Policy s3.2 -- Priority Matrix"
+    },
+    {
+      "id": "OPS-004",
+      "when": "resolved && severity == 'medium'",
+      "priority": "P3",
+      "severity": "info",
+      "message": "Medium-severity fault -- schedule into the next planned window.",
+      "actions": [
+        "create_work_order"
+      ],
+      "citation": "Maintenance Policy s3.3 -- Planned Maintenance Windows"
+    },
+    {
+      "id": "OPS-005",
+      "when": "resolved && severity == 'low' && !safetyRisk",
+      "priority": "P4",
+      "severity": "info",
+      "message": "Low-severity finding -- logged for condition trending.",
+      "actions": [
+        "log_only"
+      ],
+      "citation": "Maintenance Policy s3.4 -- Condition Monitoring"
+    },
+    {
+      "id": "SUP-001",
+      "when": "spareSku && !spareInStock",
+      "priority": "P2",
+      "severity": "warning",
+      "message": "Required spare {spareSku} is out of stock (lead time {spareLeadTimeDays} days) -- raise procurement.",
+      "actions": [
+        "raise_purchase_request",
+        "notify_planner"
+      ],
+      "citation": "Spare Parts Policy s5.1 -- Stock-Out Escalation"
+    },
+    {
+      "id": "AIQ-001",
+      "when": "confidence < 0.55",
+      "priority": "P2",
+      "severity": "warning",
+      "message": "Diagnostic confidence {confidence} is below the 0.55 floor -- human verification required.",
+      "actions": [
+        "require_human_review"
+      ],
+      "citation": "AI Assurance Policy s3.1 -- Confidence Floor"
+    },
+    {
+      "id": "AIQ-002",
+      "when": "!resolved",
+      "priority": "P2",
+      "severity": "blocker",
+      "message": "The reported asset could not be matched to the registry -- a human must identify it.",
+      "actions": [
+        "require_human_review"
+      ],
+      "citation": "AI Assurance Policy s3.4 -- No Action on Unidentified Assets"
+    },
+    {
+      "id": "AIQ-003",
+      "when": "citationCount == 0",
+      "priority": "P3",
+      "severity": "warning",
+      "message": "No supporting documentation was retrieved -- treat this diagnosis as advisory.",
+      "actions": [
+        "require_human_review"
+      ],
+      "citation": "AI Assurance Policy s3.2 -- Grounding Requirement"
+    }
+  ],
+  "allowedActions": [
+    {
+      "id": "create_work_order",
+      "label": "Create work order",
+      "reversible": true
+    },
+    {
+      "id": "raise_purchase_request",
+      "label": "Raise purchase request",
+      "reversible": true
+    },
+    {
+      "id": "notify_duty_engineer",
+      "label": "Notify duty engineer",
+      "reversible": false
+    },
+    {
+      "id": "notify_supervisor",
+      "label": "Notify supervisor",
+      "reversible": false
+    },
+    {
+      "id": "notify_planner",
+      "label": "Notify maintenance planner",
+      "reversible": false
+    },
+    {
+      "id": "notify_hse",
+      "label": "Notify HSE duty officer",
+      "reversible": false
+    },
+    {
+      "id": "freeze_asset",
+      "label": "Take asset out of service",
+      "reversible": true
+    },
+    {
+      "id": "require_permit_to_work",
+      "label": "Require permit to work",
+      "reversible": true
+    },
+    {
+      "id": "schedule_statutory_inspection",
+      "label": "Schedule statutory inspection",
+      "reversible": true
+    },
+    {
+      "id": "deploy_containment",
+      "label": "Deploy spill containment",
+      "reversible": false
+    },
+    {
+      "id": "require_human_review",
+      "label": "Route for human review",
+      "reversible": true
+    },
+    {
+      "id": "log_only",
+      "label": "Log for trending only",
+      "reversible": true
+    }
+  ]
+}

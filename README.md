@@ -94,8 +94,11 @@ The reasoning lives behind a REST API, and the orchestrators sit on top:
 - **[`integrations/power-platform/`](integrations/power-platform/)** — a
   Swagger 2.0 custom connector, a Power Automate flow with an Approvals branch,
   and the Copilot Studio agent setup including the topic instructions.
-- **[`integrations/n8n/`](integrations/n8n/)** — an importable workflow that
-  runs visually today with no licence: `docker compose --profile n8n up`.
+- **[`integrations/n8n/`](integrations/n8n/)** — two importable workflows: a
+  thin one that lets n8n drive this service, and a
+  **[standalone](integrations/n8n/standalone/)** one that runs the entire
+  pipeline inside n8n with no backend at all. Both run visually today with no
+  licence.
 
 Why not build it *inside* Copilot Studio? Because those tools are excellent at
 triggers, Microsoft 365 connectors, approvals, identity and DLP — and poor at
@@ -158,9 +161,14 @@ status     awaiting_approval — P1, blocker rule, irreversible actions
 ```bash
 make test    # 41 tests, no network, no keys
 make lint
+
+cd integrations/n8n/standalone && node test.mjs    # 11 more, for the n8n build
 ```
 
-The suite covers the parts that fail silently rather than loudly: that
+The n8n suite runs the exact `jsCode` strings that ship inside
+`workflow.json`, so the low-code half of the repo is tested too.
+
+The suites cover the parts that fail silently rather than loudly: that
 prompt injection never reaches a model, that a rejected action never reaches a
 connector, that an unidentified asset never gets a work order, that the planner
 cannot invent an action, and that telemetry values cannot corrupt asset

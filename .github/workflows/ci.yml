@@ -25,3 +25,23 @@ jobs:
         run: |
           python -c "import json,glob,sys; [json.load(open(f)) for f in glob.glob('integrations/**/*.json', recursive=True)]; print('integration JSON valid')"
           python -c "import yaml,glob; [yaml.safe_load(open(f)) for f in glob.glob('config/*.yaml')]; print('config YAML valid')"
+
+  n8n:
+    name: Standalone n8n workflow
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integrations/n8n/standalone
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Rebuild the workflow
+        run: node build.mjs
+      - name: Fail if workflow.json is out of date with its sources
+        run: |
+          git diff --exit-code workflow.json \
+            || { echo "::error::workflow.json is stale. Run 'node build.mjs' in integrations/n8n/standalone and commit the result."; exit 1; }
+      - name: Test the workflow
+        run: node test.mjs
